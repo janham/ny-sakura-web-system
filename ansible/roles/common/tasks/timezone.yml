@@ -1,0 +1,15 @@
+---
+# タイムゾーン設定: Asia/Tokyo
+- name: Set timezone to Asia/Tokyo
+  community.general.timezone:
+    name: Asia/Tokyo
+  become: true
+
+- name: Verify timezone setting
+  command: timedatectl
+  register: timezone_result
+  changed_when: false
+
+- name: Display timezone
+  debug:
+    msg: "{{ timezone_result.stdout_lines }}"

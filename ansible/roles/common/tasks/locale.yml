@@ -1,0 +1,15 @@
+---
+# ロケール設定: ja_JP.UTF-8
+- name: Set locale to ja_JP.UTF-8
+  command: localectl set-locale LANG=ja_JP.UTF-8
+  become: true
+  changed_when: false
+
+- name: Verify locale setting
+  command: localectl status
+  register: locale_result
+  changed_when: false
+
+- name: Display locale
+  debug:
+    msg: "{{ locale_result.stdout_lines }}"
