@@ -34,11 +34,6 @@ server {
     location ~ ~$ {
         deny all;
     }
-
-    # Deny access to non-public directories
-    location ~ ^/(?!public) {
-        deny all;
-    }
 }
 
 # HTTPS configuration will be added in Phase 6 after SSL certificate acquisition
