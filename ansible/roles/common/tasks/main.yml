@@ -1,0 +1,40 @@
+---
+# Common role - OS基本設定
+- name: Display starting common role
+  debug:
+    msg: "Starting common role - OS basic setup"
+
+- name: Configure timezone
+  include_tasks: timezone.yml
+  tags:
+    - timezone
+    - common
+
+- name: Configure locale
+  include_tasks: locale.yml
+  tags:
+    - locale
+    - common
+
+- name: Configure SELinux
+  include_tasks: selinux.yml
+  tags:
+    - selinux
+    - common
+
+- name: Disable firewalld
+  include_tasks: firewall.yml
+  tags:
+    - firewall
+    - common
+
+- name: Update system packages
+  include_tasks: system_update.yml
+  tags:
+    - system_update
+    - common
+  when: common_system_update | default(true)
+
+- name: Display common role completion
+  debug:
+    msg: "Common role - OS basic setup completed"
