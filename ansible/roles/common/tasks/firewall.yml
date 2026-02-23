@@ -1,0 +1,19 @@
+---
+# firewalld 無効化
+- name: Stop and disable firewalld
+  systemd:
+    name: firewalld
+    state: stopped
+    enabled: false
+  become: true
+  ignore_errors: true
+
+- name: Verify firewalld status
+  command: systemctl status firewalld
+  register: firewalld_result
+  changed_when: false
+  failed_when: false
+
+- name: Display firewalld status
+  debug:
+    msg: "firewalld is {{ 'inactive' if 'inactive' in firewalld_result.stdout else 'active' }}"
