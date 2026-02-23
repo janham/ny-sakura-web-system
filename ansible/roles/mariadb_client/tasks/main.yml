@@ -1,0 +1,21 @@
+---
+# MariaDB Client role - Main tasks
+- name: Display starting mariadb_client role
+  debug:
+    msg: "Starting MariaDB Client role - Installation and database setup"
+
+- name: Install MariaDB client
+  include_tasks: install.yml
+  tags:
+    - mariadb_client
+    - install
+
+- name: Create databases
+  include_tasks: databases.yml
+  tags:
+    - mariadb_client
+    - databases
+
+- name: Display mariadb_client role completion
+  debug:
+    msg: "MariaDB Client role completed - Databases are ready"

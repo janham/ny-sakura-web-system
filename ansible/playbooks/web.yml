@@ -39,6 +39,16 @@
         - php74
         - phase4
 
+    - role: mariadb_client
+      tags:
+        - mariadb_client
+        - phase6
+
+    - role: nfs
+      tags:
+        - nfs
+        - phase6
+
   post_tasks:
     - name: Display playbook completion
       debug:

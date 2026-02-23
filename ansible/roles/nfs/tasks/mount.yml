@@ -1,0 +1,57 @@
+---
+# NFS マウント設定
+- name: Install NFS utilities
+  dnf:
+    name:
+      - nfs-utils
+    state: present
+  become: true
+
+- name: Create NFS mount point directory
+  file:
+    path: "{{ nfs_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Mount NFS share
+  ansible.posix.mount:
+    path: "{{ nfs_mount_point }}"
+    src: "{{ nfs_server_ip }}:{{ nfs_export_path }}"
+    fstype: nfs
+    opts: defaults,_netdev
+    state: mounted
+  become: true
+
+- name: Verify NFS mount
+  command: df -h {{ nfs_mount_point }}
+  register: nfs_mount_verify
+  changed_when: false
+
+- name: Display NFS mount status
+  debug:
+    msg: "{{ nfs_mount_verify.stdout_lines }}"
+
+- name: Test NFS write permission
+  file:
+    path: "{{ nfs_mount_point }}/test_ansible_write"
+    state: touch
+    owner: nginx
+    group: nginx
+    mode: '0644'
+  become: true
+  register: nfs_write_test
+  ignore_errors: true
+
+- name: Remove test file
+  file:
+    path: "{{ nfs_mount_point }}/test_ansible_write"
+    state: absent
+  become: true
+  when: nfs_write_test is succeeded
+
+- name: Display NFS write test result
+  debug:
+    msg: "NFS write test: {{ 'SUCCESS' if nfs_write_test is succeeded else 'FAILED' }}"

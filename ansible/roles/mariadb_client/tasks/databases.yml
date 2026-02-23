@@ -1,0 +1,53 @@
+---
+# データベース作成
+- name: Create databases
+  community.mysql.mysql_db:
+    login_host: "{{ mariadb_host }}"
+    login_port: "{{ mariadb_port }}"
+    login_user: faw43478
+    login_password: "{{ vault_db_default_password }}"
+    name: "{{ item.db_name }}"
+    state: present
+    encoding: utf8mb4
+    collation: utf8mb4_general_ci
+  loop:
+    - { db_name: "supplier2" }
+    - { db_name: "portal2" }
+    - { db_name: "portal2_new" }
+  become: true
+  no_log: true
+
+- name: Create database users with SQL
+  shell: |
+    mysql -h {{ mariadb_host }} -P {{ mariadb_port }} -u faw43478 -p'{{ vault_db_default_password }}' << 'EOF'
+    CREATE USER IF NOT EXISTS '{{ item.user }}'@'%' IDENTIFIED BY '{{ item.password }}';
+    GRANT ALL PRIVILEGES ON {{ item.db }}.* TO '{{ item.user }}'@'%';
+    FLUSH PRIVILEGES;
+    EOF
+  loop:
+    - { db: "supplier2", user: "supplier2_user", password: "{{ vault_db_password_supplier2 }}" }
+    - { db: "portal2", user: "portal2_user", password: "{{ vault_db_password_portal2 }}" }
+    - { db: "portal2_new", user: "portal2_new_user", password: "{{ vault_db_password_portal2_new }}" }
+  register: user_create
+  changed_when: "'IF NOT EXISTS' not in user_create.stdout"
+  no_log: true
+
+- name: Verify databases exist
+  command: mysql -h {{ mariadb_host }} -P {{ mariadb_port }} -u faw43478 -p'{{ vault_db_default_password }}' -e "SHOW DATABASES LIKE 'supplier2'; SHOW DATABASES LIKE 'portal2'; SHOW DATABASES LIKE 'portal2_new';"
+  register: db_verify
+  changed_when: false
+  no_log: true
+
+- name: Display database creation status
+  debug:
+    msg: "Databases created successfully"
+
+- name: Verify database users exist
+  command: mysql -h {{ mariadb_host }} -P {{ mariadb_port }} -u faw43478 -p'{{ vault_db_default_password }}' -e "SELECT user, host FROM mysql.user WHERE user IN ('supplier2_user', 'portal2_user', 'portal2_new_user');"
+  register: user_verify
+  changed_when: false
+  no_log: true
+
+- name: Display user verification result
+  debug:
+    msg: "{{ user_verify.stdout_lines }}"

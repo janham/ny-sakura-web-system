@@ -1,0 +1,29 @@
+---
+# MariaDB クライアントインストール
+- name: Install MariaDB client
+  dnf:
+    name:
+      - mariadb
+      - python3-PyMySQL
+    state: present
+  become: true
+
+- name: Verify MariaDB client installation
+  command: mysql --version
+  register: mysql_version
+  changed_when: false
+
+- name: Display MariaDB client version
+  debug:
+    msg: "{{ mysql_version.stdout }}"
+
+- name: Test MariaDB connection
+  command: mysql -h {{ mariadb_host }} -P {{ mariadb_port }} -u faw43478 -p'{{ vault_db_default_password }}' -e "SELECT 1"
+  register: mysql_connection_test
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Display MariaDB connection status
+  debug:
+    msg: "MariaDB connection: {{ 'SUCCESS' if mysql_connection_test.rc == 0 else 'FAILED' }}"

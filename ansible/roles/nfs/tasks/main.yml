@@ -1,0 +1,15 @@
+---
+# NFS role - Main tasks
+- name: Display starting NFS role
+  debug:
+    msg: "Starting NFS role - Mount NFS appliance"
+
+- name: Mount NFS share
+  include_tasks: mount.yml
+  tags:
+    - nfs
+    - mount
+
+- name: Display NFS role completion
+  debug:
+    msg: "NFS role completed - NFS share is mounted and accessible"
