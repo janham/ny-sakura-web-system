@@ -1,0 +1,62 @@
+---
+# VirtualHost 設定
+- name: Create VirtualHost config for supplier2
+  template:
+    src: supplier2.conf.j2
+    dest: /etc/nginx/conf.d/supplier2.conf
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'nginx -t -c /etc/nginx/nginx.conf'
+  become: true
+  notify: restart nginx
+
+- name: Create VirtualHost config for portal2
+  template:
+    src: portal2.conf.j2
+    dest: /etc/nginx/conf.d/portal2.conf
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'nginx -t -c /etc/nginx/nginx.conf'
+  become: true
+  notify: restart nginx
+
+- name: Create VirtualHost config for portal2-new
+  template:
+    src: portal2-new.conf.j2
+    dest: /etc/nginx/conf.d/portal2-new.conf
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'nginx -t -c /etc/nginx/nginx.conf'
+  become: true
+  notify: restart nginx
+
+- name: Ensure application directories exist
+  file:
+    path: "{{ app_base_dir }}/{{ item }}/public"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '0755'
+  become: true
+  loop: "{{ app_sites }}"
+
+- name: Create test index.html for each site
+  copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head><title>{{ item }} - Test Page</title></head>
+      <body>
+        <h1>{{ item }} - Test Page</h1>
+        <p>Nginx is working!</p>
+      </body>
+      </html>
+    dest: "{{ app_base_dir }}/{{ item }}/public/index.html"
+    owner: nginx
+    group: nginx
+    mode: '0644'
+  become: true
+  loop: "{{ app_sites }}"

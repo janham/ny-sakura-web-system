@@ -1,0 +1,16 @@
+---
+# Nginx インストール
+- name: Install nginx
+  dnf:
+    name: nginx
+    state: present
+  become: true
+
+- name: Verify nginx installation
+  command: nginx -v
+  register: nginx_version
+  changed_when: false
+
+- name: Display nginx version
+  debug:
+    msg: "{{ nginx_version.stderr }}"

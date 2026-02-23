@@ -1,0 +1,44 @@
+---
+# Nginx role - Main tasks
+- name: Display starting nginx role
+  debug:
+    msg: "Starting nginx role - Installation and configuration"
+
+- name: Install nginx
+  include_tasks: install.yml
+  tags:
+    - nginx
+    - install
+
+- name: Configure nginx
+  include_tasks: config.yml
+  tags:
+    - nginx
+    - config
+
+- name: Configure VirtualHosts
+  include_tasks: vhosts.yml
+  tags:
+    - nginx
+    - vhosts
+
+- name: Enable and start nginx service
+  systemd:
+    name: nginx
+    state: started
+    enabled: true
+  become: true
+
+- name: Verify nginx is running
+  command: systemctl status nginx
+  register: nginx_status
+  changed_when: false
+  failed_when: false
+
+- name: Display nginx status
+  debug:
+    msg: "Nginx is {{ 'running' if 'active (running)' in nginx_status.stdout else 'not running' }}"
+
+- name: Display nginx role completion
+  debug:
+    msg: "Nginx role completed - HTTP server is ready"

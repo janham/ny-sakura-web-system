@@ -1,0 +1,44 @@
+# Managed by Ansible
+# VirtualHost for portal2.mobileselection.jp
+# PHP 7.4 (Remi)
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name portal2.mobileselection.jp;
+
+    root {{ app_base_dir }}/portal2/public;
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/portal2.mobileselection.jp_access.log main;
+    error_log /var/log/nginx/portal2.mobileselection.jp_error.log;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_pass unix:/var/opt/remi/php74/run/php-fpm/www.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Deny access to hidden files
+    location ~ /\. {
+        deny all;
+    }
+
+    # Deny access to backup files
+    location ~ ~$ {
+        deny all;
+    }
+
+    # Deny access to non-public directories
+    location ~ ^/(?!public) {
+        deny all;
+    }
+}
+
+# HTTPS configuration will be added in Phase 6 after SSL certificate acquisition

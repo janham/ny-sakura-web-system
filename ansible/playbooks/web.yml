@@ -24,6 +24,11 @@
         - common
         - phase1
 
+    - role: nginx
+      tags:
+        - nginx
+        - phase2
+
   post_tasks:
     - name: Display playbook completion
       debug:
