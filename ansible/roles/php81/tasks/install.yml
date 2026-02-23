@@ -1,0 +1,30 @@
+---
+# PHP 8.1 インストール
+- name: Disable default PHP module
+  command: dnf module disable php -y
+  become: true
+  changed_when: false
+
+- name: Enable PHP 8.1 module
+  command: dnf module enable php:8.1 -y
+  become: true
+  register: php_module_enable
+  changed_when: "'Enabling module streams' in php_module_enable.stdout"
+
+- name: Install PHP 8.1 core packages
+  dnf:
+    name:
+      - php
+      - php-cli
+      - php-fpm
+    state: present
+  become: true
+
+- name: Verify PHP installation
+  command: php -v
+  register: php_version
+  changed_when: false
+
+- name: Display PHP version
+  debug:
+    msg: "{{ php_version.stdout_lines[0] }}"

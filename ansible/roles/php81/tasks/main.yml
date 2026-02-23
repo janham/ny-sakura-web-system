@@ -1,0 +1,33 @@
+---
+# PHP 8.1 role - Main tasks
+- name: Display starting php81 role
+  debug:
+    msg: "Starting PHP 8.1 role - Installation and configuration"
+
+- name: Install PHP 8.1
+  include_tasks: install.yml
+  tags:
+    - php81
+    - install
+
+- name: Install PHP extensions
+  include_tasks: modules.yml
+  tags:
+    - php81
+    - modules
+
+- name: Configure php.ini
+  include_tasks: config.yml
+  tags:
+    - php81
+    - config
+
+- name: Configure PHP-FPM
+  include_tasks: fpm.yml
+  tags:
+    - php81
+    - fpm
+
+- name: Display php81 role completion
+  debug:
+    msg: "PHP 8.1 role completed - PHP is ready for supplier2 and portal2-new"

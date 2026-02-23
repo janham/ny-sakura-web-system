@@ -1,0 +1,36 @@
+---
+# PHP 8.1 拡張モジュールインストール
+- name: Install required PHP extensions
+  dnf:
+    name:
+      - php-pdo
+      - php-mysqlnd
+      - php-mbstring
+      - php-gd
+      - php-xml
+      - php-opcache
+      - php-pecl-zip
+      - php-bcmath
+      - php-json
+      - php-intl
+      - php-soap
+    state: present
+  become: true
+
+- name: Install additional useful PHP extensions
+  dnf:
+    name:
+      - php-process
+      - php-pecl-apcu
+    state: present
+  become: true
+  ignore_errors: true
+
+- name: Verify installed PHP modules
+  command: php -m
+  register: php_modules
+  changed_when: false
+
+- name: Display installed PHP modules (essential ones)
+  debug:
+    msg: "Essential modules installed: pdo_mysql={{ 'pdo_mysql' in php_modules.stdout }}, mbstring={{ 'mbstring' in php_modules.stdout }}, gd={{ 'gd' in php_modules.stdout }}, opcache={{ 'Zend OPcache' in php_modules.stdout }}"

@@ -29,6 +29,11 @@
         - nginx
         - phase2
 
+    - role: php81
+      tags:
+        - php81
+        - phase3
+
   post_tasks:
     - name: Display playbook completion
       debug:

@@ -1,0 +1,13 @@
+---
+# PHP-FPM handlers
+- name: restart php-fpm
+  systemd:
+    name: php-fpm
+    state: restarted
+  become: true
+
+- name: reload php-fpm
+  systemd:
+    name: php-fpm
+    state: reloaded
+  become: true

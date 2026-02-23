@@ -1,0 +1,63 @@
+---
+# PHP-FPM 設定
+- name: Backup original PHP-FPM www.conf
+  copy:
+    src: /etc/php-fpm.d/www.conf
+    dest: /etc/php-fpm.d/www.conf.backup
+    remote_src: true
+    force: false
+  become: true
+
+- name: Configure PHP-FPM user
+  lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^user\s*='
+    line: 'user = nginx'
+    backup: false
+  become: true
+  notify: restart php-fpm
+
+- name: Configure PHP-FPM group
+  lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^group\s*='
+    line: 'group = nginx'
+    backup: false
+  become: true
+  notify: restart php-fpm
+
+- name: Verify PHP-FPM socket configuration
+  shell: grep "^listen\s*=" /etc/php-fpm.d/www.conf
+  register: php_fpm_listen
+  changed_when: false
+
+- name: Display PHP-FPM socket path
+  debug:
+    msg: "{{ php_fpm_listen.stdout }}"
+
+- name: Enable and start PHP-FPM service
+  systemd:
+    name: php-fpm
+    state: started
+    enabled: true
+  become: true
+
+- name: Verify PHP-FPM is running
+  command: systemctl status php-fpm
+  register: php_fpm_status
+  changed_when: false
+  failed_when: false
+
+- name: Display PHP-FPM status
+  debug:
+    msg: "PHP-FPM is {{ 'running' if 'active (running)' in php_fpm_status.stdout else 'not running' }}"
+
+- name: Check PHP-FPM socket file
+  stat:
+    path: /run/php-fpm/www.sock
+  register: php_fpm_socket
+  become: true
+
+- name: Display PHP-FPM socket status
+  debug:
+    msg: "PHP-FPM socket exists: {{ php_fpm_socket.stat.exists }}"
