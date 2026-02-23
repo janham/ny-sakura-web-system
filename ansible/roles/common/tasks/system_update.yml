@@ -1,0 +1,19 @@
+---
+# システム更新
+- name: Clean dnf cache
+  command: dnf clean all
+  become: true
+  changed_when: false
+
+- name: Update all packages
+  dnf:
+    name: "*"
+    state: latest
+    update_cache: true
+  become: true
+  register: update_result
+
+- name: Display update result
+  debug:
+    msg: "System update completed. {{ update_result.results | length }} packages updated."
+  when: update_result.changed
