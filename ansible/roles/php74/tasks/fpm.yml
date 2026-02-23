@@ -53,6 +53,15 @@
   become: true
   notify: restart php74-php-fpm
 
+- name: Configure PHP 7.4 PHP-FPM ACL users
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^listen.acl_users\s*='
+    line: 'listen.acl_users = apache,nginx'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
 - name: Verify PHP 7.4 PHP-FPM socket configuration
   shell: grep "^listen\s*=" /etc/opt/remi/php74/php-fpm.d/www.conf
   register: php74_fpm_listen
