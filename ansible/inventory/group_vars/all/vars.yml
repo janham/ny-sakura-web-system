@@ -1,0 +1,30 @@
+---
+# タイムゾーン・ロケール
+timezone: Asia/Tokyo
+locale: ja_JP.UTF-8
+
+# SSH 設定
+ssh_port: 26622
+
+# nginx
+nginx_user: nginx
+
+# PHP バージョン
+php81_version: "8.1"
+php74_version: "7.4"
+
+# アプリケーション配置先
+app_base_dir: /var/www/app
+app_sites:
+  - supplier2
+  - portal2
+  - portal2-new
+
+# NFS
+nfs_server_ip: "{{ vault_nfs_server_ip }}"
+nfs_export_path: "{{ vault_nfs_export_path }}"
+nfs_mount_point: /mnt/shared
+
+# MariaDB
+mariadb_host: "{{ vault_mariadb_host }}"
+mariadb_port: 3306

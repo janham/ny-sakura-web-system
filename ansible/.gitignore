@@ -1,0 +1,10 @@
+# Vault パスワードファイル
+*.vault_pass
+.vault_pass
+~/.ansible_vault_pass
+
+# リトライファイル
+*.retry
+
+# その他
+.DS_Store
