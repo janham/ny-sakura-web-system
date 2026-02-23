@@ -1,0 +1,22 @@
+---
+# SELinux設定: permissive モード
+- name: Set SELinux to permissive mode (temporary)
+  command: setenforce Permissive
+  become: true
+  when: ansible_selinux.status == "enabled" and ansible_selinux.mode != "permissive"
+  ignore_errors: true
+
+- name: Set SELinux to permissive mode (persistent)
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  become: true
+
+- name: Verify SELinux setting
+  command: getenforce
+  register: selinux_result
+  changed_when: false
+
+- name: Display SELinux status
+  debug:
+    msg: "SELinux mode: {{ selinux_result.stdout }}"
