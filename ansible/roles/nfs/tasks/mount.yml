@@ -34,9 +34,18 @@
   debug:
     msg: "{{ nfs_mount_verify.stdout_lines }}"
 
-- name: Test NFS write permission
+- name: Create application directory on NFS
   file:
-    path: "{{ nfs_mount_point }}/test_ansible_write"
+    path: "{{ nfs_mount_point }}/apps"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '0775'
+  become: true
+
+- name: Test NFS write permission in apps directory
+  file:
+    path: "{{ nfs_mount_point }}/apps/test_ansible_write"
     state: touch
     owner: nginx
     group: nginx
@@ -47,7 +56,7 @@
 
 - name: Remove test file
   file:
-    path: "{{ nfs_mount_point }}/test_ansible_write"
+    path: "{{ nfs_mount_point }}/apps/test_ansible_write"
     state: absent
   become: true
   when: nfs_write_test is succeeded
