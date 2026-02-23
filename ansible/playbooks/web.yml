@@ -1,0 +1,30 @@
+---
+# Webサーバー構築 Playbook
+- name: Build Web Server
+  hosts: web
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display playbook start
+      debug:
+        msg: "Starting Web Server build for {{ inventory_hostname }}"
+
+    - name: Display server information
+      debug:
+        msg:
+          - "Hostname: {{ inventory_hostname }}"
+          - "Public IP: {{ ansible_host }}"
+          - "Private IP: {{ ansible_default_ipv4.address }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+  roles:
+    - role: common
+      tags:
+        - common
+        - phase1
+
+  post_tasks:
+    - name: Display playbook completion
+      debug:
+        msg: "Web Server build completed successfully"
