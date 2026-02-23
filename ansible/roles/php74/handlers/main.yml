@@ -1,0 +1,13 @@
+---
+# PHP 7.4 PHP-FPM handlers
+- name: restart php74-php-fpm
+  systemd:
+    name: php74-php-fpm
+    state: restarted
+  become: true
+
+- name: reload php74-php-fpm
+  systemd:
+    name: php74-php-fpm
+    state: reloaded
+  become: true

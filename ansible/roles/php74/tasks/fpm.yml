@@ -1,0 +1,90 @@
+---
+# PHP 7.4 PHP-FPM 設定
+- name: Backup original PHP 7.4 PHP-FPM www.conf
+  copy:
+    src: /etc/opt/remi/php74/php-fpm.d/www.conf
+    dest: /etc/opt/remi/php74/php-fpm.d/www.conf.backup
+    remote_src: true
+    force: false
+  become: true
+
+- name: Configure PHP 7.4 PHP-FPM user
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^user\s*='
+    line: 'user = nginx'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
+- name: Configure PHP 7.4 PHP-FPM group
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^group\s*='
+    line: 'group = nginx'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
+- name: Configure PHP 7.4 PHP-FPM socket owner
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^;?listen.owner\s*='
+    line: 'listen.owner = nginx'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
+- name: Configure PHP 7.4 PHP-FPM socket group
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^;?listen.group\s*='
+    line: 'listen.group = nginx'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
+- name: Configure PHP 7.4 PHP-FPM socket mode
+  lineinfile:
+    path: /etc/opt/remi/php74/php-fpm.d/www.conf
+    regexp: '^;?listen.mode\s*='
+    line: 'listen.mode = 0660'
+    backup: false
+  become: true
+  notify: restart php74-php-fpm
+
+- name: Verify PHP 7.4 PHP-FPM socket configuration
+  shell: grep "^listen\s*=" /etc/opt/remi/php74/php-fpm.d/www.conf
+  register: php74_fpm_listen
+  changed_when: false
+
+- name: Display PHP 7.4 PHP-FPM socket path
+  debug:
+    msg: "{{ php74_fpm_listen.stdout }}"
+
+- name: Enable and start PHP 7.4 PHP-FPM service
+  systemd:
+    name: php74-php-fpm
+    state: started
+    enabled: true
+  become: true
+
+- name: Verify PHP 7.4 PHP-FPM is running
+  command: systemctl status php74-php-fpm
+  register: php74_fpm_status
+  changed_when: false
+  failed_when: false
+
+- name: Display PHP 7.4 PHP-FPM status
+  debug:
+    msg: "PHP 7.4 PHP-FPM is {{ 'running' if 'active (running)' in php74_fpm_status.stdout else 'not running' }}"
+
+- name: Check PHP 7.4 PHP-FPM socket file
+  stat:
+    path: /var/opt/remi/php74/run/php-fpm/www.sock
+  register: php74_fpm_socket
+  become: true
+
+- name: Display PHP 7.4 PHP-FPM socket status
+  debug:
+    msg: "PHP 7.4 PHP-FPM socket exists: {{ php74_fpm_socket.stat.exists }}"

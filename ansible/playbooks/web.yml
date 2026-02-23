@@ -34,6 +34,11 @@
         - php81
         - phase3
 
+    - role: php74
+      tags:
+        - php74
+        - phase4
+
   post_tasks:
     - name: Display playbook completion
       debug:

@@ -26,6 +26,33 @@
   become: true
   notify: restart php-fpm
 
+- name: Configure PHP-FPM socket owner
+  lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^;?listen.owner\s*='
+    line: 'listen.owner = nginx'
+    backup: false
+  become: true
+  notify: restart php-fpm
+
+- name: Configure PHP-FPM socket group
+  lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^;?listen.group\s*='
+    line: 'listen.group = nginx'
+    backup: false
+  become: true
+  notify: restart php-fpm
+
+- name: Configure PHP-FPM socket mode
+  lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^;?listen.mode\s*='
+    line: 'listen.mode = 0660'
+    backup: false
+  become: true
+  notify: restart php-fpm
+
 - name: Verify PHP-FPM socket configuration
   shell: grep "^listen\s*=" /etc/php-fpm.d/www.conf
   register: php_fpm_listen

@@ -1,0 +1,48 @@
+---
+# PHP 7.4 拡張モジュールインストール
+- name: Install required PHP 7.4 extensions
+  dnf:
+    name:
+      - php74-php-pdo
+      - php74-php-mysqlnd
+      - php74-php-pgsql
+      - php74-php-mbstring
+      - php74-php-gd
+      - php74-php-xml
+      - php74-php-opcache
+      - php74-php-pecl-zip
+      - php74-php-bcmath
+      - php74-php-json
+      - php74-php-intl
+      - php74-php-soap
+    state: present
+    enablerepo: remi
+  become: true
+
+- name: Install additional PHP 7.4 extensions
+  dnf:
+    name:
+      - php74-php-process
+      - php74-php-pecl-apcu
+      - php74-php-mcrypt
+    state: present
+    enablerepo: remi
+  become: true
+  ignore_errors: true
+
+- name: Install mecab extension (if available)
+  dnf:
+    name: php74-php-mecab
+    state: present
+    enablerepo: remi
+  become: true
+  ignore_errors: true
+
+- name: Verify installed PHP 7.4 modules
+  command: /opt/remi/php74/root/usr/bin/php -m
+  register: php74_modules
+  changed_when: false
+
+- name: Display installed PHP 7.4 modules (essential ones)
+  debug:
+    msg: "Essential modules installed: pdo_mysql={{ 'pdo_mysql' in php74_modules.stdout }}, mbstring={{ 'mbstring' in php74_modules.stdout }}, gd={{ 'gd' in php74_modules.stdout }}, opcache={{ 'Zend OPcache' in php74_modules.stdout }}"

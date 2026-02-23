@@ -1,0 +1,27 @@
+---
+# PHP 7.4 インストール
+- name: Install PHP 7.4 core packages from Remi
+  dnf:
+    name:
+      - php74-php
+      - php74-php-cli
+      - php74-php-fpm
+    state: present
+    enablerepo: remi
+  become: true
+
+- name: Verify PHP 7.4 installation
+  command: /opt/remi/php74/root/usr/bin/php -v
+  register: php74_version
+  changed_when: false
+
+- name: Display PHP 7.4 version
+  debug:
+    msg: "{{ php74_version.stdout_lines[0] }}"
+
+- name: Create symlink for easy access (optional)
+  file:
+    src: /opt/remi/php74/root/usr/bin/php
+    dest: /usr/local/bin/php74
+    state: link
+  become: true
