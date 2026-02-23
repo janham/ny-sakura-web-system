@@ -1,0 +1,467 @@
+---
+# WEBサーバーテスト実行Playbook
+- name: Execute Web Server Infrastructure Tests
+  hosts: web
+  gather_facts: true
+
+  vars:
+    test_results: []
+
+  tasks:
+    - name: Display test start
+      debug:
+        msg: "=== WEBサーバー構築テスト開始 ==="
+
+    # Phase 1: OS基本設定テスト
+    - name: TEST-01-01 - ホスト名確認
+      command: hostname
+      register: test_01_01
+      changed_when: false
+
+    - name: TEST-01-02 - タイムゾーン確認
+      shell: timedatectl | grep "Time zone"
+      register: test_01_02
+      changed_when: false
+
+    - name: TEST-01-03 - ロケール確認
+      shell: localectl status | grep LANG
+      register: test_01_03
+      changed_when: false
+
+    - name: TEST-01-04 - SELinux状態確認
+      command: getenforce
+      register: test_01_04
+      changed_when: false
+
+    - name: TEST-01-05 - Firewalld状態確認
+      command: systemctl is-active firewalld
+      register: test_01_05
+      changed_when: false
+      failed_when: false
+
+    - name: TEST-01-06 - SSH設定確認
+      shell: grep "^Port" /etc/ssh/sshd_config
+      register: test_01_06
+      changed_when: false
+
+    # Phase 2: Nginx テスト
+    - name: TEST-02-01 - Nginxインストール確認
+      command: nginx -v
+      register: test_02_01
+      changed_when: false
+
+    - name: TEST-02-02 - Nginxサービス状態確認
+      shell: systemctl is-active nginx && systemctl is-enabled nginx
+      register: test_02_02
+      changed_when: false
+
+    - name: TEST-02-03 - VirtualHost設定確認
+      shell: ls -1 /etc/nginx/conf.d/*.conf
+      register: test_02_03
+      changed_when: false
+
+    - name: TEST-02-04 - Nginx設定構文チェック
+      command: nginx -t
+      register: test_02_04
+      changed_when: false
+      become: true
+
+    - name: TEST-02-05 - HTTPアクセステスト (supplier2)
+      shell: 'curl -s -o /dev/null -w "%{http_code}" -H "Host: supplier2.mobileselection.jp" http://localhost/'
+      register: test_02_05
+      changed_when: false
+
+    - name: TEST-02-06 - HTTPアクセステスト (portal2)
+      shell: 'curl -s -o /dev/null -w "%{http_code}" -H "Host: portal2.mobileselection.jp" http://localhost/'
+      register: test_02_06
+      changed_when: false
+
+    - name: TEST-02-07 - HTTPアクセステスト (portal2-new)
+      shell: 'curl -s -o /dev/null -w "%{http_code}" -H "Host: portal2-new.mobileselection.jp" http://localhost/'
+      register: test_02_07
+      changed_when: false
+
+    # Phase 3: PHP 8.1 テスト
+    - name: TEST-03-01 - PHP 8.1インストール確認
+      command: php -v
+      register: test_03_01
+      changed_when: false
+
+    - name: TEST-03-02 - PHP-FPMサービス状態確認
+      shell: systemctl is-active php-fpm && systemctl is-enabled php-fpm
+      register: test_03_02
+      changed_when: false
+
+    - name: TEST-03-03 - PHP-FPMソケット確認
+      stat:
+        path: /run/php-fpm/www.sock
+      register: test_03_03
+
+    - name: TEST-03-04 - PHP-FPMソケット権限確認
+      shell: stat -c "%U:%G" /run/php-fpm/www.sock
+      register: test_03_04
+      changed_when: false
+
+    - name: TEST-03-05 - PHP動作確認 (supplier2)
+      shell: 'curl -s -H "Host: supplier2.mobileselection.jp" http://localhost/info.php | grep -o "PHP Version 8.1.[0-9]*"'
+      register: test_03_05
+      changed_when: false
+
+    - name: TEST-03-06 - PHP動作確認 (portal2-new)
+      shell: 'curl -s -H "Host: portal2-new.mobileselection.jp" http://localhost/info.php | grep -o "PHP Version 8.1.[0-9]*"'
+      register: test_03_06
+      changed_when: false
+
+    # Phase 4: PHP 7.4 テスト
+    - name: TEST-04-01 - PHP 7.4インストール確認
+      command: /opt/remi/php74/root/usr/bin/php -v
+      register: test_04_01
+      changed_when: false
+
+    - name: TEST-04-02 - PHP 7.4 FPMサービス状態確認
+      shell: systemctl is-active php74-php-fpm && systemctl is-enabled php74-php-fpm
+      register: test_04_02
+      changed_when: false
+
+    - name: TEST-04-03 - PHP 7.4 FPMソケット確認
+      stat:
+        path: /var/opt/remi/php74/run/php-fpm/www.sock
+      register: test_04_03
+
+    - name: TEST-04-04 - PHP 7.4 FPMソケットACL確認
+      shell: getfacl /var/opt/remi/php74/run/php-fpm/www.sock | grep nginx
+      register: test_04_04
+      changed_when: false
+
+    - name: TEST-04-05 - PHP 7.4動作確認 (portal2)
+      shell: 'curl -s -H "Host: portal2.mobileselection.jp" http://localhost/info.php | grep -o "PHP Version 7.4.[0-9]*"'
+      register: test_04_05
+      changed_when: false
+
+    # Phase 6: MariaDB Client + NFS テスト
+    - name: TEST-06-01 - MariaDBクライアントインストール確認
+      command: mysql --version
+      register: test_06_01
+      changed_when: false
+
+    - name: TEST-06-02 - MariaDB接続確認
+      shell: mysql -h 192.168.0.40 -P 3306 -u faw43478 -p'z@wDswfPzKGA3Hj' -e "SELECT 1"
+      register: test_06_02
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-03 - データベース存在確認
+      shell: mysql -h 192.168.0.40 -P 3306 -u faw43478 -p'z@wDswfPzKGA3Hj' -e "SHOW DATABASES" | grep -E "(supplier2|portal2|portal2_new)"
+      register: test_06_03
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-04 - データベースユーザー存在確認
+      shell: mysql -h 192.168.0.40 -P 3306 -u faw43478 -p'z@wDswfPzKGA3Hj' -e "SELECT user FROM mysql.user WHERE user IN ('supplier2_user', 'portal2_user', 'portal2_new_user')"
+      register: test_06_04
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-05 - データベースユーザー接続確認 (supplier2)
+      shell: mysql -h 192.168.0.40 -P 3306 -u supplier2_user -p'DAAnJ0PheDVd[j#g20f=' -e "SELECT DATABASE()" supplier2
+      register: test_06_05
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-06 - データベースユーザー接続確認 (portal2)
+      shell: mysql -h 192.168.0.40 -P 3306 -u portal2_user -p'fb%J*]dcr>k%-e,Ei497' -e "SELECT DATABASE()" portal2
+      register: test_06_06
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-07 - データベースユーザー接続確認 (portal2_new)
+      shell: mysql -h 192.168.0.40 -P 3306 -u portal2_new_user -p'3imJ)<m{ZqB}4a@H1;u8' -e "SELECT DATABASE()" portal2_new
+      register: test_06_07
+      changed_when: false
+      no_log: true
+
+    - name: TEST-06-08 - NFSマウント確認
+      shell: df -h /mnt/shared | grep "192.168.0.30:/export"
+      register: test_06_08
+      changed_when: false
+
+    - name: TEST-06-09 - NFS自動マウント設定確認
+      shell: grep "192.168.0.30:/export" /etc/fstab
+      register: test_06_09
+      changed_when: false
+
+    - name: TEST-06-10 - NFS書き込みテスト
+      shell: sudo -u nginx touch /mnt/shared/apps/test_file && sudo -u nginx rm /mnt/shared/apps/test_file && echo "SUCCESS"
+      register: test_06_10
+      changed_when: false
+      become: true
+
+    # アプリケーションディレクトリ構造テスト
+    - name: TEST-APP-01 - ベースディレクトリ確認
+      shell: ls -ld /var/www/app
+      register: test_app_01
+      changed_when: false
+
+    - name: TEST-APP-02 - アプリケーションディレクトリ確認
+      shell: ls -1 /var/www/app
+      register: test_app_02
+      changed_when: false
+
+    - name: TEST-APP-03 - storageディレクトリ権限確認
+      shell: ls -ld /var/www/app/supplier2/storage
+      register: test_app_03
+      changed_when: false
+
+    - name: TEST-APP-04 - publicディレクトリ確認
+      shell: ls -ld /var/www/app/supplier2/public
+      register: test_app_04
+      changed_when: false
+
+    # 総合テスト
+    - name: TEST-ALL-01 - 全サービス起動確認
+      shell: systemctl is-active nginx php-fpm php74-php-fpm
+      register: test_all_01
+      changed_when: false
+
+    - name: TEST-ALL-02 - メモリ使用状況確認
+      command: free -h
+      register: test_all_02
+      changed_when: false
+
+    - name: TEST-ALL-03 - ディスク使用状況確認
+      command: df -h /
+      register: test_all_03
+      changed_when: false
+
+    - name: Display test completion
+      debug:
+        msg: "=== WEBサーバー構築テスト完了 ==="
+
+    # テスト結果をローカルに保存
+    - name: Save test results to local
+      delegate_to: localhost
+      copy:
+        content: |
+          # WEBサーバー構築テスト結果
+
+          **テスト実行日時**: {{ ansible_date_time.iso8601 }}
+          **対象サーバー**: {{ inventory_hostname }} ({{ ansible_host }})
+          **OSバージョン**: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+          ---
+
+          ## Phase 1: OS基本設定テスト
+
+          ### TEST-01-01: ホスト名確認
+          - **結果**: {{ 'PASS' if 'gs-web-server' in test_01_01.stdout else 'FAIL' }}
+          - **出力**: {{ test_01_01.stdout }}
+
+          ### TEST-01-02: タイムゾーン確認
+          - **結果**: {{ 'PASS' if 'Asia/Tokyo' in test_01_02.stdout else 'FAIL' }}
+          - **出力**: {{ test_01_02.stdout }}
+
+          ### TEST-01-03: ロケール確認
+          - **結果**: {{ 'PASS' if 'ja_JP.UTF-8' in test_01_03.stdout else 'FAIL' }}
+          - **出力**: {{ test_01_03.stdout }}
+
+          ### TEST-01-04: SELinux状態確認
+          - **結果**: {{ 'PASS' if test_01_04.stdout == 'Permissive' else 'FAIL' }}
+          - **出力**: {{ test_01_04.stdout }}
+
+          ### TEST-01-05: Firewalld状態確認
+          - **結果**: {{ 'PASS' if test_01_05.stdout == 'inactive' else 'FAIL' }}
+          - **出力**: {{ test_01_05.stdout }}
+
+          ### TEST-01-06: SSH設定確認
+          - **結果**: {{ 'PASS' if 'Port 26622' in test_01_06.stdout else 'FAIL' }}
+          - **出力**: {{ test_01_06.stdout }}
+
+          ---
+
+          ## Phase 2: Nginx テスト
+
+          ### TEST-02-01: Nginxインストール確認
+          - **結果**: {{ 'PASS' if test_02_01.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_02_01.stderr }}
+
+          ### TEST-02-02: Nginxサービス状態確認
+          - **結果**: {{ 'PASS' if test_02_02.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_02_02.stdout }}
+
+          ### TEST-02-03: VirtualHost設定確認
+          - **結果**: {{ 'PASS' if test_02_03.stdout_lines | length == 3 else 'FAIL' }}
+          - **出力**:
+          {% for line in test_02_03.stdout_lines %}
+            - {{ line }}
+          {% endfor %}
+
+          ### TEST-02-04: Nginx設定構文チェック
+          - **結果**: {{ 'PASS' if 'syntax is ok' in test_02_04.stderr and 'test is successful' in test_02_04.stderr else 'FAIL' }}
+          - **出力**: {{ test_02_04.stderr }}
+
+          ### TEST-02-05: HTTPアクセステスト (supplier2)
+          - **結果**: {{ 'PASS' if test_02_05.stdout == '200' else 'FAIL' }}
+          - **HTTPステータス**: {{ test_02_05.stdout }}
+
+          ### TEST-02-06: HTTPアクセステスト (portal2)
+          - **結果**: {{ 'PASS' if test_02_06.stdout == '200' else 'FAIL' }}
+          - **HTTPステータス**: {{ test_02_06.stdout }}
+
+          ### TEST-02-07: HTTPアクセステスト (portal2-new)
+          - **結果**: {{ 'PASS' if test_02_07.stdout == '200' else 'FAIL' }}
+          - **HTTPステータス**: {{ test_02_07.stdout }}
+
+          ---
+
+          ## Phase 3: PHP 8.1 テスト
+
+          ### TEST-03-01: PHP 8.1インストール確認
+          - **結果**: {{ 'PASS' if 'PHP 8.1' in test_03_01.stdout else 'FAIL' }}
+          - **出力**: {{ test_03_01.stdout_lines[0] }}
+
+          ### TEST-03-02: PHP-FPMサービス状態確認
+          - **結果**: {{ 'PASS' if test_03_02.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_03_02.stdout }}
+
+          ### TEST-03-03: PHP-FPMソケット確認
+          - **結果**: {{ 'PASS' if test_03_03.stat.exists else 'FAIL' }}
+          - **存在**: {{ test_03_03.stat.exists }}
+
+          ### TEST-03-04: PHP-FPMソケット権限確認
+          - **結果**: {{ 'PASS' if test_03_04.stdout == 'nginx:nginx' else 'FAIL' }}
+          - **所有者**: {{ test_03_04.stdout }}
+
+          ### TEST-03-05: PHP動作確認 (supplier2)
+          - **結果**: {{ 'PASS' if 'PHP Version 8.1' in test_03_05.stdout else 'FAIL' }}
+          - **出力**: {{ test_03_05.stdout }}
+
+          ### TEST-03-06: PHP動作確認 (portal2-new)
+          - **結果**: {{ 'PASS' if 'PHP Version 8.1' in test_03_06.stdout else 'FAIL' }}
+          - **出力**: {{ test_03_06.stdout }}
+
+          ---
+
+          ## Phase 4: PHP 7.4 テスト
+
+          ### TEST-04-01: PHP 7.4インストール確認
+          - **結果**: {{ 'PASS' if 'PHP 7.4' in test_04_01.stdout else 'FAIL' }}
+          - **出力**: {{ test_04_01.stdout_lines[0] }}
+
+          ### TEST-04-02: PHP 7.4 FPMサービス状態確認
+          - **結果**: {{ 'PASS' if test_04_02.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_04_02.stdout }}
+
+          ### TEST-04-03: PHP 7.4 FPMソケット確認
+          - **結果**: {{ 'PASS' if test_04_03.stat.exists else 'FAIL' }}
+          - **存在**: {{ test_04_03.stat.exists }}
+
+          ### TEST-04-04: PHP 7.4 FPMソケットACL確認
+          - **結果**: {{ 'PASS' if 'nginx' in test_04_04.stdout else 'FAIL' }}
+          - **出力**: {{ test_04_04.stdout }}
+
+          ### TEST-04-05: PHP 7.4動作確認 (portal2)
+          - **結果**: {{ 'PASS' if 'PHP Version 7.4' in test_04_05.stdout else 'FAIL' }}
+          - **出力**: {{ test_04_05.stdout }}
+
+          ---
+
+          ## Phase 6: MariaDB Client + NFS テスト
+
+          ### TEST-06-01: MariaDBクライアントインストール確認
+          - **結果**: {{ 'PASS' if 'MariaDB' in test_06_01.stdout else 'FAIL' }}
+          - **出力**: {{ test_06_01.stdout }}
+
+          ### TEST-06-02: MariaDB接続確認
+          - **結果**: {{ 'PASS' if test_06_02.rc == 0 else 'FAIL' }}
+          - **ステータス**: 接続成功
+
+          ### TEST-06-03: データベース存在確認
+          - **結果**: {{ 'PASS' if test_06_03.stdout_lines | length == 3 else 'FAIL' }}
+          - **データベース数**: {{ test_06_03.stdout_lines | length }}
+
+          ### TEST-06-04: データベースユーザー存在確認
+          - **結果**: {{ 'PASS' if test_06_04.stdout_lines | length == 4 else 'FAIL' }}
+          - **ユーザー数**: {{ test_06_04.stdout_lines | length - 1 }}
+
+          ### TEST-06-05: データベースユーザー接続確認 (supplier2)
+          - **結果**: {{ 'PASS' if test_06_05.rc == 0 else 'FAIL' }}
+          - **ステータス**: 接続成功
+
+          ### TEST-06-06: データベースユーザー接続確認 (portal2)
+          - **結果**: {{ 'PASS' if test_06_06.rc == 0 else 'FAIL' }}
+          - **ステータス**: 接続成功
+
+          ### TEST-06-07: データベースユーザー接続確認 (portal2_new)
+          - **結果**: {{ 'PASS' if test_06_07.rc == 0 else 'FAIL' }}
+          - **ステータス**: 接続成功
+
+          ### TEST-06-08: NFSマウント確認
+          - **結果**: {{ 'PASS' if test_06_08.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_06_08.stdout }}
+
+          ### TEST-06-09: NFS自動マウント設定確認
+          - **結果**: {{ 'PASS' if test_06_09.rc == 0 else 'FAIL' }}
+          - **出力**: {{ test_06_09.stdout }}
+
+          ### TEST-06-10: NFS書き込みテスト
+          - **結果**: {{ 'PASS' if 'SUCCESS' in test_06_10.stdout else 'FAIL' }}
+          - **出力**: {{ test_06_10.stdout }}
+
+          ---
+
+          ## アプリケーションディレクトリ構造テスト
+
+          ### TEST-APP-01: ベースディレクトリ確認
+          - **結果**: {{ 'PASS' if 'nginx' in test_app_01.stdout else 'FAIL' }}
+          - **出力**: {{ test_app_01.stdout }}
+
+          ### TEST-APP-02: アプリケーションディレクトリ確認
+          - **結果**: {{ 'PASS' if test_app_02.stdout_lines | length == 3 else 'FAIL' }}
+          - **ディレクトリ数**: {{ test_app_02.stdout_lines | length }}
+          - **出力**:
+          {% for line in test_app_02.stdout_lines %}
+            - {{ line }}
+          {% endfor %}
+
+          ### TEST-APP-03: storageディレクトリ権限確認
+          - **結果**: {{ 'PASS' if 'drwxrwxr-x' in test_app_03.stdout and 'nginx' in test_app_03.stdout else 'FAIL' }}
+          - **出力**: {{ test_app_03.stdout }}
+
+          ### TEST-APP-04: publicディレクトリ確認
+          - **結果**: {{ 'PASS' if 'drwxr-xr-x' in test_app_04.stdout and 'nginx' in test_app_04.stdout else 'FAIL' }}
+          - **出力**: {{ test_app_04.stdout }}
+
+          ---
+
+          ## 総合テスト
+
+          ### TEST-ALL-01: 全サービス起動確認
+          - **結果**: {{ 'PASS' if test_all_01.rc == 0 else 'FAIL' }}
+          - **出力**:
+          {% for line in test_all_01.stdout_lines %}
+            - {{ line }}
+          {% endfor %}
+
+          ### TEST-ALL-02: メモリ使用状況確認
+          - **結果**: PASS
+          - **出力**:
+          ```
+          {{ test_all_02.stdout }}
+          ```
+
+          ### TEST-ALL-03: ディスク使用状況確認
+          - **結果**: PASS
+          - **出力**:
+          ```
+          {{ test_all_03.stdout }}
+          ```
+
+          ---
+
+          ## テストサマリー
+
+          **総テスト数**: 47
+          **実行日時**: {{ ansible_date_time.iso8601 }}
+          **サーバー**: {{ inventory_hostname }}
+        dest: /Users/hironori/Work/sakura-server-pj/docs/test/web-server-test-results.md
+      run_once: true

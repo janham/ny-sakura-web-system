@@ -49,6 +49,11 @@
         - nfs
         - phase6
 
+    - role: ssl
+      tags:
+        - ssl
+        - phase7
+
   post_tasks:
     - name: Display playbook completion
       debug:

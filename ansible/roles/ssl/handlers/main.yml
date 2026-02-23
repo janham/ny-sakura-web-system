@@ -1,0 +1,13 @@
+---
+# SSL role handlers
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted
+  become: true
+
+- name: reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+  become: true

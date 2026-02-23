@@ -1,0 +1,251 @@
+---
+# PHP 7.4 mecab ソースインストール Playbook
+- name: Install PHP 7.4 mecab from source
+  hosts: web
+  become: true
+  gather_facts: true
+
+  vars:
+    mecab_version: "0.996"
+    php_mecab_version: "1.0.0"
+
+  tasks:
+    - name: Display installation start
+      debug:
+        msg: "=== PHP 7.4 mecab ソースインストール開始 ==="
+
+    # 依存パッケージインストール
+    - name: Install build dependencies
+      dnf:
+        name:
+          - gcc
+          - gcc-c++
+          - make
+          - autoconf
+          - automake
+          - libtool
+          - php74-php-devel
+          - mecab-devel
+        state: present
+
+    - name: Create build directory
+      file:
+        path: /tmp/mecab-build
+        state: directory
+        mode: '0755'
+
+    # PHP mecab extension ダウンロードと確認
+    - name: Check available PHP mecab packages
+      shell: pecl search mecab
+      environment:
+        PATH: "/opt/remi/php74/root/usr/bin:{{ ansible_env.PATH }}"
+      register: pecl_search
+      changed_when: false
+      failed_when: false
+
+    - name: Display PECL search results
+      debug:
+        msg: "{{ pecl_search.stdout_lines }}"
+
+    # Option 1: PECL経由でインストール試行
+    - name: Try installing mecab via PECL
+      shell: |
+        export PATH="/opt/remi/php74/root/usr/bin:$PATH"
+        yes '' | pecl install mecab || exit 0
+      args:
+        executable: /bin/bash
+      register: pecl_install
+      changed_when: "'successfully installed' in pecl_install.stdout"
+      failed_when: false
+
+    - name: Display PECL install result
+      debug:
+        msg: "{{ pecl_install.stdout_lines }}"
+
+    # mecab.so の場所を確認
+    - name: Find mecab.so location
+      shell: find /opt/remi/php74 -name "mecab.so" 2>/dev/null || echo "not found"
+      register: mecab_so_location
+      changed_when: false
+
+    - name: Display mecab.so location
+      debug:
+        msg: "mecab.so location: {{ mecab_so_location.stdout_lines }}"
+
+    # PHP 7.4 拡張ディレクトリ確認
+    - name: Get PHP 7.4 extension directory
+      shell: /opt/remi/php74/root/usr/bin/php -i | grep "extension_dir" | head -1 | awk '{print $3}'
+      register: php74_ext_dir
+      changed_when: false
+
+    - name: Display PHP 7.4 extension directory
+      debug:
+        msg: "PHP 7.4 extension dir: {{ php74_ext_dir.stdout }}"
+
+    # mecab.ini 設定ファイル作成
+    - name: Check if mecab.so exists in extension directory
+      stat:
+        path: "{{ php74_ext_dir.stdout }}/mecab.so"
+      register: mecab_so_stat
+
+    - name: Create mecab.ini configuration
+      copy:
+        content: |
+          ; Enable mecab extension module
+          extension=mecab.so
+        dest: /etc/opt/remi/php74/php.d/40-mecab.ini
+        owner: root
+        group: root
+        mode: '0644'
+      when: mecab_so_stat.stat.exists
+
+    - name: Restart PHP 7.4 FPM service
+      systemd:
+        name: php74-php-fpm
+        state: restarted
+      when: mecab_so_stat.stat.exists
+
+    - name: Wait for PHP-FPM to restart
+      pause:
+        seconds: 3
+      when: mecab_so_stat.stat.exists
+
+    # 検証
+    - name: Verify mecab installation
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i mecab
+      register: mecab_verify
+      changed_when: false
+      failed_when: false
+
+    - name: Display verification result
+      debug:
+        msg: |
+          ===========================================
+          mecab インストール結果: {{ 'SUCCESS' if mecab_verify.rc == 0 else 'FAILED' }}
+          ===========================================
+          {% if mecab_verify.rc == 0 %}
+          mecab モジュールが正常にインストールされました。
+          {{ mecab_verify.stdout }}
+          {% else %}
+          mecab のインストールに失敗しました。
+
+          理由:
+          - PECL に mecab パッケージが存在しない可能性
+          - または、手動コンパイルが必要
+
+          代替案:
+          1. アプリケーションで mecab を使用しない方法を検討
+          2. 手動で mecab PHP extension をコンパイル
+          3. 別の形態素解析ライブラリを使用
+          {% endif %}
+
+    # クリーンアップ
+    - name: Cleanup build directory
+      file:
+        path: /tmp/mecab-build
+        state: absent
+
+    # 結果保存
+    - name: Save installation results
+      delegate_to: localhost
+      become: false
+      copy:
+        content: |
+          # PHP 7.4 mecab ソースインストール結果
+
+          **実行日時**: {{ ansible_date_time.iso8601 }}
+          **対象サーバー**: {{ inventory_hostname }}
+
+          ---
+
+          ## インストール方法
+
+          PECL経由でのインストールを試行しました。
+
+          ### PECL Search 結果
+          ```
+          {{ pecl_search.stdout }}
+          ```
+
+          ### PECL Install 結果
+          ```
+          {{ pecl_install.stdout }}
+          ```
+
+          ### mecab.so 場所
+          ```
+          {{ mecab_so_location.stdout }}
+          ```
+
+          ### PHP 7.4 Extension Directory
+          ```
+          {{ php74_ext_dir.stdout }}
+          ```
+
+          ---
+
+          ## 最終確認
+
+          ### モジュール確認
+          ```bash
+          /opt/remi/php74/root/usr/bin/php -m | grep mecab
+          ```
+
+          **結果**: {{ 'SUCCESS - mecab インストール済み' if mecab_verify.rc == 0 else 'FAILED - mecab インストール失敗' }}
+
+          {% if mecab_verify.rc == 0 %}
+          ```
+          {{ mecab_verify.stdout }}
+          ```
+          {% else %}
+          ---
+
+          ## インストール失敗時の対応
+
+          mecab PHP extension が PECL に存在しないか、コンパイルに失敗しました。
+
+          ### 代替案
+
+          1. **アプリケーション側で対応**
+             - mecab を使用しない実装に変更
+             - 別の形態素解析ライブラリを使用
+
+          2. **手動コンパイル**
+             ```bash
+             # mecab PHP extension のソースを取得
+             git clone https://github.com/rsky/php-mecab.git
+             cd php-mecab
+
+             # PHP 7.4 用にコンパイル
+             /opt/remi/php74/root/usr/bin/phpize
+             ./configure --with-php-config=/opt/remi/php74/root/usr/bin/php-config
+             make
+             sudo make install
+
+             # 拡張を有効化
+             echo "extension=mecab.so" | sudo tee /etc/opt/remi/php74/php.d/40-mecab.ini
+             sudo systemctl restart php74-php-fpm
+             ```
+
+          3. **mecab 不要の確認**
+             - 実際のアプリケーションコードで mecab が必須か確認
+             - 使用されていない場合は対応不要
+          {% endif %}
+
+          ---
+
+          ## 推奨事項
+
+          {% if mecab_verify.rc != 0 %}
+          1. アプリケーション開発者に mecab の必要性を確認
+          2. 必須でない場合は、mecab なしで運用
+          3. 必須の場合は、上記の手動コンパイル手順を実施
+          {% else %}
+          mecab が正常にインストールされました。追加作業は不要です。
+          {% endif %}
+        dest: /Users/hironori/Work/sakura-server-pj/docs/test/mecab-install-results.md
+      run_once: true
+
+    - name: Display installation completion
+      debug:
+        msg: "=== mecab インストール処理完了 ==="

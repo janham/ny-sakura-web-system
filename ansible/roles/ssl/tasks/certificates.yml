@@ -1,0 +1,76 @@
+---
+# SSL証明書取得
+- name: Check if certificates already exist
+  stat:
+    path: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
+  loop:
+    - supplier2.mobileselection.jp
+    - portal2.mobileselection.jp
+    - portal2-new.mobileselection.jp
+  register: cert_status
+  become: true
+
+- name: Display certificate status
+  debug:
+    msg: "Certificate for {{ item.item }}: {{ 'EXISTS' if item.stat.exists else 'NOT FOUND' }}"
+  loop: "{{ cert_status.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Obtain SSL certificate for supplier2.mobileselection.jp
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email admin@mobileselection.jp
+    --domains supplier2.mobileselection.jp
+  when: not cert_status.results[0].stat.exists
+  become: true
+  register: cert_supplier2
+
+- name: Obtain SSL certificate for portal2.mobileselection.jp
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email admin@mobileselection.jp
+    --domains portal2.mobileselection.jp
+  when: not cert_status.results[1].stat.exists
+  become: true
+  register: cert_portal2
+
+- name: Obtain SSL certificate for portal2-new.mobileselection.jp
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email admin@mobileselection.jp
+    --domains portal2-new.mobileselection.jp
+  when: not cert_status.results[2].stat.exists
+  become: true
+  register: cert_portal2_new
+
+- name: Verify certificates were obtained
+  stat:
+    path: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
+  loop:
+    - supplier2.mobileselection.jp
+    - portal2.mobileselection.jp
+    - portal2-new.mobileselection.jp
+  register: cert_verify
+  become: true
+
+- name: Display certificate verification
+  debug:
+    msg: "Certificate verification for {{ item.item }}: {{ 'SUCCESS' if item.stat.exists else 'FAILED' }}"
+  loop: "{{ cert_verify.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Fail if any certificate is missing
+  fail:
+    msg: "Certificate for {{ item.item }} was not obtained successfully"
+  when: not item.stat.exists
+  loop: "{{ cert_verify.results }}"
+  loop_control:
+    label: "{{ item.item }}"

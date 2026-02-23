@@ -1,0 +1,24 @@
+---
+# certbot インストール
+- name: Install EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+  become: true
+
+- name: Install certbot and nginx plugin
+  dnf:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+  become: true
+
+- name: Verify certbot installation
+  command: certbot --version
+  register: certbot_version
+  changed_when: false
+
+- name: Display certbot version
+  debug:
+    msg: "{{ certbot_version.stdout }}"

@@ -1,0 +1,203 @@
+---
+# PHP追加モジュールインストール Playbook
+- name: Install Additional PHP Modules
+  hosts: web
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Display installation start
+      debug:
+        msg: "=== PHP追加モジュールインストール開始 ==="
+
+    # PHP 8.1 - opcache
+    - name: Check if PHP 8.1 opcache is already enabled
+      shell: php -m | grep -i opcache
+      register: php81_opcache_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 8.1 opcache current status
+      debug:
+        msg: "PHP 8.1 opcache: {{ 'Already enabled' if php81_opcache_check.rc == 0 else 'Not found' }}"
+
+    - name: Install PHP 8.1 opcache module
+      dnf:
+        name: php-opcache
+        state: present
+      when: php81_opcache_check.rc != 0
+
+    - name: Verify PHP 8.1 opcache installation
+      shell: php -m | grep -i opcache
+      register: php81_opcache_verify
+      changed_when: false
+
+    - name: Display PHP 8.1 opcache verification
+      debug:
+        msg: "PHP 8.1 opcache: {{ php81_opcache_verify.stdout }}"
+
+    # PHP 7.4 - mecab
+    - name: Check if PHP 7.4 mecab is installed
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i mecab
+      register: php74_mecab_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 7.4 mecab current status
+      debug:
+        msg: "PHP 7.4 mecab: {{ 'Already installed' if php74_mecab_check.rc == 0 else 'Not found' }}"
+
+    - name: Install mecab library
+      dnf:
+        name:
+          - mecab
+          - mecab-ipadic
+        state: present
+
+    - name: Install PHP 7.4 mecab module
+      dnf:
+        name: php74-php-mecab
+        state: present
+        enablerepo: remi
+      when: php74_mecab_check.rc != 0
+      register: mecab_install
+      ignore_errors: true
+
+    - name: Display mecab installation note
+      debug:
+        msg: "Note: php74-php-mecab is not available in repository. This module may need to be compiled from source if required."
+      when: mecab_install is failed
+
+    - name: Verify PHP 7.4 mecab installation
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i mecab
+      register: php74_mecab_verify
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 7.4 mecab verification
+      debug:
+        msg: "PHP 7.4 mecab: {{ php74_mecab_verify.stdout if php74_mecab_verify.rc == 0 else 'Installation may require different package name' }}"
+
+    # PHP 7.4 - pdo_pgsql
+    - name: Check if PHP 7.4 pdo_pgsql is installed
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i pdo_pgsql
+      register: php74_pgsql_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 7.4 pdo_pgsql current status
+      debug:
+        msg: "PHP 7.4 pdo_pgsql: {{ 'Already installed' if php74_pgsql_check.rc == 0 else 'Not found' }}"
+
+    - name: Install PostgreSQL client library
+      dnf:
+        name: postgresql-libs
+        state: present
+
+    - name: Install PHP 7.4 pgsql module (includes pdo_pgsql)
+      dnf:
+        name: php74-php-pgsql
+        state: present
+      when: php74_pgsql_check.rc != 0
+
+    - name: Verify PHP 7.4 pdo_pgsql installation
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -E "pdo_pgsql|pgsql"
+      register: php74_pgsql_verify
+      changed_when: false
+
+    - name: Display PHP 7.4 pdo_pgsql verification
+      debug:
+        msg: "{{ php74_pgsql_verify.stdout_lines }}"
+
+    # Restart PHP-FPM services
+    - name: Restart PHP 8.1 FPM service
+      systemd:
+        name: php-fpm
+        state: restarted
+
+    - name: Restart PHP 7.4 FPM service
+      systemd:
+        name: php74-php-fpm
+        state: restarted
+
+    - name: Wait for PHP-FPM services to restart
+      pause:
+        seconds: 3
+
+    # Final verification
+    - name: Final check - PHP 8.1 opcache
+      shell: php -i | grep -i "opcache.enable"
+      register: final_opcache
+      changed_when: false
+
+    - name: Final check - PHP 7.4 mecab
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i mecab
+      register: final_mecab
+      changed_when: false
+      failed_when: false
+
+    - name: Final check - PHP 7.4 pdo_pgsql
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -i pdo_pgsql
+      register: final_pgsql
+      changed_when: false
+
+    - name: Display final verification results
+      debug:
+        msg:
+          - "=== インストール結果 ==="
+          - "PHP 8.1 opcache: {{ 'ENABLED' if 'On' in final_opcache.stdout else 'CHECK REQUIRED' }}"
+          - "PHP 7.4 mecab: {{ 'INSTALLED' if final_mecab.rc == 0 else 'NOT AVAILABLE (may not exist in repo)' }}"
+          - "PHP 7.4 pdo_pgsql: {{ 'INSTALLED' if final_pgsql.rc == 0 else 'FAILED' }}"
+
+    # Save results
+    - name: Save installation results to local
+      delegate_to: localhost
+      become: false
+      copy:
+        content: |
+          # PHP追加モジュールインストール結果
+
+          **実行日時**: {{ ansible_date_time.iso8601 }}
+          **対象サーバー**: {{ inventory_hostname }}
+
+          ---
+
+          ## インストール済みモジュール
+
+          ### PHP 8.1 - opcache
+          ```
+          {{ final_opcache.stdout }}
+          ```
+          **状態**: {{ 'ENABLED' if 'On' in final_opcache.stdout else 'CHECK REQUIRED' }}
+
+          ### PHP 7.4 - mecab
+          ```
+          {{ final_mecab.stdout if final_mecab.rc == 0 else 'モジュールが見つかりません（リポジトリに存在しない可能性）' }}
+          ```
+          **状態**: {{ 'INSTALLED' if final_mecab.rc == 0 else 'NOT AVAILABLE' }}
+
+          ### PHP 7.4 - pdo_pgsql
+          ```
+          {{ final_pgsql.stdout }}
+          ```
+          **状態**: {{ 'INSTALLED' if final_pgsql.rc == 0 else 'FAILED' }}
+
+          ---
+
+          ## 完全なモジュールリスト
+
+          ### PHP 8.1
+          ```bash
+          php -m
+          ```
+
+          ### PHP 7.4
+          ```bash
+          /opt/remi/php74/root/usr/bin/php -m
+          ```
+        dest: /Users/hironori/Work/sakura-server-pj/docs/test/php-modules-install-results.md
+      run_once: true
+
+    - name: Display installation completion
+      debug:
+        msg: "=== PHP追加モジュールインストール完了 ==="

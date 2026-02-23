@@ -1,0 +1,387 @@
+---
+# PHP 7.4 mecab 完全インストール Playbook (ソースコンパイル)
+- name: Install mecab and PHP mecab extension from source
+  hosts: web
+  become: true
+  gather_facts: true
+
+  vars:
+    mecab_version: "0.996.13"
+    mecab_url: "https://github.com/shogo82148/mecab/archive/refs/tags/v{{ mecab_version }}.tar.gz"
+    mecab_ipadic_version: "2.7.0-20070801"
+    mecab_ipadic_url: "https://drive.google.com/uc?export=download&id=0B4y35FiV1wh7MWVlSDBCSXZMTXM"
+    php_mecab_repo: "https://github.com/rsky/php-mecab.git"
+    build_dir: "/tmp/mecab-build"
+
+  tasks:
+    - name: Display installation start
+      debug:
+        msg: "=== mecab 完全インストール開始（ソースコンパイル）==="
+
+    # ビルド環境準備
+    - name: Install essential build tools
+      dnf:
+        name:
+          - gcc
+          - gcc-c++
+          - make
+          - automake
+          - autoconf
+          - libtool
+          - wget
+          - git
+          - php74-php-devel
+        state: present
+
+    - name: Create build directory
+      file:
+        path: "{{ build_dir }}"
+        state: directory
+        mode: '0755'
+
+    # mecab 本体のインストール
+    - name: Check if mecab-config is available
+      command: mecab-config --version
+      register: mecab_config_check
+      changed_when: false
+      failed_when: false
+
+    - name: Download mecab source
+      get_url:
+        url: "{{ mecab_url }}"
+        dest: "{{ build_dir }}/mecab-{{ mecab_version }}.tar.gz"
+        mode: '0644'
+      when: mecab_config_check.rc != 0
+
+    - name: Extract mecab source
+      unarchive:
+        src: "{{ build_dir }}/mecab-{{ mecab_version }}.tar.gz"
+        dest: "{{ build_dir }}"
+        remote_src: true
+      when: mecab_config_check.rc != 0
+
+    - name: Build and install mecab
+      shell: |
+        cd {{ build_dir }}/mecab-{{ mecab_version }}/mecab
+        ./autogen.sh
+        ./configure --prefix=/usr --with-charset=utf8
+        make
+        make install
+        ldconfig
+      when: mecab_config_check.rc != 0
+
+    - name: Find mecab location
+      shell: which mecab || echo "/usr/local/bin/mecab"
+      register: mecab_path
+      changed_when: false
+
+    - name: Verify mecab installation
+      command: "{{ mecab_path.stdout }} --version"
+      register: mecab_verify
+      changed_when: false
+
+    - name: Display mecab version
+      debug:
+        msg: "mecab installed: {{ mecab_verify.stdout }}"
+
+    # mecab-ipadic (辞書) のインストール
+    - name: Find mecab-config location
+      shell: which mecab-config || echo "/usr/bin/mecab-config"
+      register: mecab_config_path
+      changed_when: false
+
+    - name: Get mecab dictionary directory
+      shell: "{{ mecab_config_path.stdout }} --dicdir"
+      register: mecab_dicdir
+      changed_when: false
+
+    - name: Check if mecab-ipadic is installed in correct location
+      stat:
+        path: "{{ mecab_dicdir.stdout }}/ipadic/dicrc"
+      register: ipadic_dicrc_stat
+
+    - name: Extract bundled mecab-ipadic model
+      shell: |
+        cd {{ build_dir }}/mecab-{{ mecab_version }}
+        bunzip2 -k mecab-ipadic-2.7.0-20070801.model.bz2
+      when: not ipadic_dicrc_stat.stat.exists
+
+    - name: Build and install bundled mecab-ipadic
+      shell: |
+        cd {{ build_dir }}/mecab-{{ mecab_version }}/mecab-ipadic
+        ./autogen.sh
+        ./configure --with-charset=utf8 --with-mecab-config={{ mecab_config_path.stdout }}
+        make
+        make install
+      when: not ipadic_dicrc_stat.stat.exists
+
+    - name: Create symlink for dictionary path compatibility
+      file:
+        src: /usr/lib64/mecab/dic/ipadic
+        dest: /usr/lib/mecab/dic/ipadic
+        state: link
+        force: true
+      when: ansible_architecture == "x86_64"
+
+    # PHP mecab extension のインストール
+    - name: Clone php-mecab repository
+      git:
+        repo: "{{ php_mecab_repo }}"
+        dest: "{{ build_dir }}/php-mecab"
+        version: master
+        force: true
+
+    - name: Build PHP mecab extension
+      shell: |
+        cd {{ build_dir }}/php-mecab/mecab
+        export PATH="/opt/remi/php74/root/usr/bin:$PATH"
+
+        # phpize実行
+        /opt/remi/php74/root/usr/bin/phpize
+
+        # configure実行
+        ./configure \
+          --with-php-config=/opt/remi/php74/root/usr/bin/php-config \
+          --with-mecab-config={{ mecab_config_path.stdout }}
+
+        # make実行
+        make
+
+        # インストール
+        make install
+      register: php_mecab_build
+
+    - name: Display PHP mecab build output
+      debug:
+        msg: "{{ php_mecab_build.stdout_lines }}"
+
+    # PHP設定
+    - name: Get PHP 7.4 extension directory
+      shell: /opt/remi/php74/root/usr/bin/php-config --extension-dir
+      register: php74_ext_dir
+      changed_when: false
+
+    - name: Verify mecab.so was installed
+      stat:
+        path: "{{ php74_ext_dir.stdout }}/mecab.so"
+      register: mecab_so_stat
+
+    - name: Display mecab.so status
+      debug:
+        msg: "mecab.so exists: {{ mecab_so_stat.stat.exists }}"
+
+    - name: Create mecab PHP configuration file
+      copy:
+        content: |
+          ; Enable mecab extension module
+          extension=mecab.so
+        dest: /etc/opt/remi/php74/php.d/40-mecab.ini
+        owner: root
+        group: root
+        mode: '0644'
+      when: mecab_so_stat.stat.exists
+
+    - name: Add /usr/local/lib to ld.so.conf
+      lineinfile:
+        path: /etc/ld.so.conf.d/local.conf
+        line: '/usr/local/lib'
+        create: true
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Run ldconfig
+      command: ldconfig
+
+    - name: Restart PHP 7.4 FPM
+      systemd:
+        name: php74-php-fpm
+        state: restarted
+
+    - name: Wait for PHP-FPM to restart
+      pause:
+        seconds: 5
+
+    # 最終検証
+    - name: Test mecab command line
+      shell: echo "すもももももももものうち" | {{ mecab_path.stdout }}
+      register: mecab_cli_test
+      changed_when: false
+
+    - name: Display mecab CLI test
+      debug:
+        msg: "{{ mecab_cli_test.stdout_lines }}"
+
+    - name: Verify PHP mecab module loaded
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep mecab
+      register: php_mecab_verify
+      changed_when: false
+
+    - name: Test PHP mecab functionality
+      shell: |
+        /opt/remi/php74/root/usr/bin/php -r '
+        if (extension_loaded("mecab")) {
+            $mecab = new MeCab\Tagger();
+            echo "MeCab extension loaded successfully\n";
+            echo "Test:\n" . $mecab->parse("今日は良い天気です");
+        } else {
+            echo "MeCab extension NOT loaded\n";
+            exit(1);
+        }
+        '
+      register: php_mecab_test
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP mecab test result
+      debug:
+        msg: "{{ php_mecab_test.stdout_lines }}"
+
+    # 結果表示
+    - name: Display installation summary
+      debug:
+        msg:
+          - "=========================================="
+          - "mecab インストール完了"
+          - "=========================================="
+          - "mecab 本体: {{ mecab_verify.stdout }}"
+          - "mecab 辞書: ipadic インストール済み"
+          - "PHP mecab extension: {{ 'インストール成功' if php_mecab_verify.rc == 0 else 'インストール失敗' }}"
+          - "動作テスト: {{ 'OK' if php_mecab_test.rc == 0 else 'FAILED' }}"
+          - "=========================================="
+
+    # クリーンアップ
+    - name: Cleanup build directory
+      file:
+        path: "{{ build_dir }}"
+        state: absent
+
+    # 結果保存
+    - name: Save installation results to local
+      delegate_to: localhost
+      become: false
+      copy:
+        content: |
+          # mecab 完全インストール結果
+
+          **実行日時**: {{ ansible_date_time.iso8601 }}
+          **対象サーバー**: {{ inventory_hostname }}
+
+          ---
+
+          ## インストール概要
+
+          ソースコンパイルにより、以下をインストールしました:
+
+          1. **mecab 本体** (v{{ mecab_version }})
+          2. **mecab-ipadic** (辞書)
+          3. **PHP mecab extension** (PHP 7.4用)
+
+          ---
+
+          ## インストール詳細
+
+          ### mecab 本体
+
+          **バージョン**:
+          ```
+          {{ mecab_verify.stdout }}
+          ```
+
+          **インストール先**: `/usr/local/bin/mecab`
+
+          **CLI テスト**:
+          ```
+          {{ mecab_cli_test.stdout }}
+          ```
+
+          ### PHP mecab extension
+
+          **モジュール確認**:
+          ```
+          {{ php_mecab_verify.stdout if php_mecab_verify.rc == 0 else 'モジュールが見つかりません' }}
+          ```
+
+          **動作テスト**:
+          ```
+          {{ php_mecab_test.stdout }}
+          ```
+
+          **状態**: {{ 'インストール成功' if php_mecab_verify.rc == 0 and php_mecab_test.rc == 0 else 'インストール失敗' }}
+
+          ---
+
+          ## 設定ファイル
+
+          ### PHP設定
+          `/etc/opt/remi/php74/php.d/40-mecab.ini`
+          ```
+          extension=mecab.so
+          ```
+
+          ### ライブラリパス
+          `/etc/ld.so.conf.d/local.conf`
+          ```
+          /usr/local/lib
+          ```
+
+          ---
+
+          ## 使用方法
+
+          ### コマンドライン
+          ```bash
+          echo "テキスト" | mecab
+          ```
+
+          ### PHP
+          ```php
+          <?php
+          $mecab = new MeCab\Tagger();
+          $result = $mecab->parse("日本語のテキスト");
+          echo $result;
+          ?>
+          ```
+
+          ---
+
+          ## メンテナンス
+
+          ### 注意事項
+          - mecab はソースからコンパイルされています
+          - OS アップデート時に再コンパイルが必要な場合があります
+          - PHP バージョンアップ時は PHP mecab extension の再コンパイルが必要
+
+          ### アンインストール
+          ```bash
+          # PHP extension
+          sudo rm /etc/opt/remi/php74/php.d/40-mecab.ini
+          sudo rm $(php74 -i | grep extension_dir | awk '{print $3}')/mecab.so
+
+          # mecab 本体
+          sudo rm -rf /usr/local/bin/mecab*
+          sudo rm -rf /usr/local/lib/mecab
+          sudo rm -rf /usr/local/lib/libmecab*
+
+          sudo systemctl restart php74-php-fpm
+          ```
+
+          ---
+
+          ## 結論
+
+          {% if php_mecab_verify.rc == 0 and php_mecab_test.rc == 0 %}
+          ✅ **mecab のインストールに成功しました**
+
+          PHP 7.4 から mecab を使用できます。
+          {% else %}
+          ❌ **mecab のインストールに失敗しました**
+
+          ログを確認し、手動でトラブルシューティングが必要です。
+          {% endif %}
+        dest: /Users/hironori/Work/sakura-server-pj/docs/test/mecab-complete-install-results.md
+      run_once: true
+
+    - name: Display completion message
+      debug:
+        msg: "=== mecab インストール処理完了 ==="

@@ -1,0 +1,33 @@
+---
+# SSL証明書設定 role - Main tasks
+- name: Display starting SSL certificate setup
+  debug:
+    msg: "Starting SSL certificate setup with Let's Encrypt"
+
+- name: Install certbot
+  include_tasks: install.yml
+  tags:
+    - ssl
+    - install
+
+- name: Obtain SSL certificates
+  include_tasks: certificates.yml
+  tags:
+    - ssl
+    - certificates
+
+- name: Configure HTTPS in nginx
+  include_tasks: nginx-https.yml
+  tags:
+    - ssl
+    - nginx
+
+- name: Setup auto-renewal
+  include_tasks: renewal.yml
+  tags:
+    - ssl
+    - renewal
+
+- name: Display SSL setup completion
+  debug:
+    msg: "SSL certificate setup completed - HTTPS enabled for all sites"

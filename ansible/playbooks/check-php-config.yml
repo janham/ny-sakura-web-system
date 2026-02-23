@@ -1,0 +1,243 @@
+---
+# PHP設定確認 Playbook
+- name: Check PHP Configuration
+  hosts: web
+  gather_facts: true
+
+  tasks:
+    - name: Display check start
+      debug:
+        msg: "=== PHP設定確認開始 ==="
+
+    # PHP 8.1 設定確認
+    - name: Get PHP 8.1 version
+      command: php -v
+      register: php81_version
+      changed_when: false
+
+    - name: Display PHP 8.1 version
+      debug:
+        msg: "{{ php81_version.stdout_lines[0] }}"
+
+    - name: Check PHP 8.1 memory_limit
+      shell: php -i | grep "memory_limit"
+      register: php81_memory
+      changed_when: false
+
+    - name: Check PHP 8.1 upload_max_filesize
+      shell: php -i | grep "upload_max_filesize"
+      register: php81_upload
+      changed_when: false
+
+    - name: Check PHP 8.1 post_max_size
+      shell: php -i | grep "post_max_size"
+      register: php81_post
+      changed_when: false
+
+    - name: Check PHP 8.1 max_execution_time
+      shell: php -i | grep "max_execution_time"
+      register: php81_exec_time
+      changed_when: false
+
+    - name: Check PHP 8.1 date.timezone
+      shell: php -i | grep "date.timezone"
+      register: php81_timezone
+      changed_when: false
+
+    - name: Display PHP 8.1 settings
+      debug:
+        msg:
+          - "=== PHP 8.1 Current Settings ==="
+          - "{{ php81_memory.stdout }}"
+          - "{{ php81_upload.stdout }}"
+          - "{{ php81_post.stdout }}"
+          - "{{ php81_exec_time.stdout }}"
+          - "{{ php81_timezone.stdout }}"
+
+    - name: List PHP 8.1 loaded modules
+      command: php -m
+      register: php81_modules
+      changed_when: false
+
+    - name: Check PHP 8.1 required modules
+      shell: php -m | grep -E "^(pdo_mysql|mysqli|mbstring|gd|curl|openssl|zip|xml|opcache)$"
+      register: php81_required_modules
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 8.1 required modules status
+      debug:
+        msg: "{{ php81_required_modules.stdout_lines }}"
+
+    # PHP 7.4 設定確認
+    - name: Get PHP 7.4 version
+      command: /opt/remi/php74/root/usr/bin/php -v
+      register: php74_version
+      changed_when: false
+
+    - name: Display PHP 7.4 version
+      debug:
+        msg: "{{ php74_version.stdout_lines[0] }}"
+
+    - name: Check PHP 7.4 memory_limit
+      shell: /opt/remi/php74/root/usr/bin/php -i | grep "memory_limit"
+      register: php74_memory
+      changed_when: false
+
+    - name: Check PHP 7.4 upload_max_filesize
+      shell: /opt/remi/php74/root/usr/bin/php -i | grep "upload_max_filesize"
+      register: php74_upload
+      changed_when: false
+
+    - name: Check PHP 7.4 post_max_size
+      shell: /opt/remi/php74/root/usr/bin/php -i | grep "post_max_size"
+      register: php74_post
+      changed_when: false
+
+    - name: Check PHP 7.4 max_execution_time
+      shell: /opt/remi/php74/root/usr/bin/php -i | grep "max_execution_time"
+      register: php74_exec_time
+      changed_when: false
+
+    - name: Display PHP 7.4 settings
+      debug:
+        msg:
+          - "=== PHP 7.4 Current Settings ==="
+          - "{{ php74_memory.stdout }}"
+          - "{{ php74_upload.stdout }}"
+          - "{{ php74_post.stdout }}"
+          - "{{ php74_exec_time.stdout }}"
+
+    - name: List PHP 7.4 loaded modules
+      command: /opt/remi/php74/root/usr/bin/php -m
+      register: php74_modules
+      changed_when: false
+
+    - name: Check PHP 7.4 required modules
+      shell: /opt/remi/php74/root/usr/bin/php -m | grep -E "^(pdo_mysql|mysqli|mbstring|gd|curl|mecab|mcrypt|apcu)$"
+      register: php74_required_modules
+      changed_when: false
+      failed_when: false
+
+    - name: Display PHP 7.4 required modules status
+      debug:
+        msg: "{{ php74_required_modules.stdout_lines }}"
+
+    # PHP-FPM pool設定確認
+    - name: Check PHP 8.1 FPM pool configuration
+      shell: grep -E "^(user|group|pm|pm\.max_children|pm\.start_servers|pm\.min_spare_servers|pm\.max_spare_servers)" /etc/php-fpm.d/www.conf
+      register: php81_fpm_config
+      changed_when: false
+      become: true
+
+    - name: Display PHP 8.1 FPM pool settings
+      debug:
+        msg:
+          - "=== PHP 8.1 FPM Pool Settings ==="
+          - "{{ php81_fpm_config.stdout_lines }}"
+
+    - name: Check PHP 7.4 FPM pool configuration
+      shell: grep -E "^(user|group|pm|pm\.max_children|pm\.start_servers|pm\.min_spare_servers|pm\.max_spare_servers)" /etc/opt/remi/php74/php-fpm.d/www.conf
+      register: php74_fpm_config
+      changed_when: false
+      become: true
+
+    - name: Display PHP 7.4 FPM pool settings
+      debug:
+        msg:
+          - "=== PHP 7.4 FPM Pool Settings ==="
+          - "{{ php74_fpm_config.stdout_lines }}"
+
+    # 結果をローカルに保存
+    - name: Save PHP configuration check results
+      delegate_to: localhost
+      copy:
+        content: |
+          # PHP設定確認結果
+
+          **確認日時**: {{ ansible_date_time.iso8601 }}
+          **対象サーバー**: {{ inventory_hostname }}
+
+          ---
+
+          ## PHP 8.1 設定
+
+          ### バージョン
+          ```
+          {{ php81_version.stdout_lines[0] }}
+          ```
+
+          ### php.ini 設定値
+          ```
+          {{ php81_memory.stdout }}
+          {{ php81_upload.stdout }}
+          {{ php81_post.stdout }}
+          {{ php81_exec_time.stdout }}
+          {{ php81_timezone.stdout }}
+          ```
+
+          ### 必須モジュール (8/9)
+          ```
+          {{ php81_required_modules.stdout }}
+          ```
+
+          ### FPM Pool 設定
+          ```
+          {{ php81_fpm_config.stdout }}
+          ```
+
+          ---
+
+          ## PHP 7.4 設定
+
+          ### バージョン
+          ```
+          {{ php74_version.stdout_lines[0] }}
+          ```
+
+          ### php.ini 設定値
+          ```
+          {{ php74_memory.stdout }}
+          {{ php74_upload.stdout }}
+          {{ php74_post.stdout }}
+          {{ php74_exec_time.stdout }}
+          ```
+
+          ### 必須モジュール
+          ```
+          {{ php74_required_modules.stdout }}
+          ```
+
+          ### FPM Pool 設定
+          ```
+          {{ php74_fpm_config.stdout }}
+          ```
+
+          ---
+
+          ## 仕様との比較
+
+          ### PHP 8.1 php.ini
+          | 項目 | 仕様 | 実際 | 状態 |
+          |------|------|------|------|
+          | memory_limit | 256M | 確認中 | - |
+          | upload_max_filesize | 20M | 確認中 | - |
+          | post_max_size | 20M | 確認中 | - |
+          | max_execution_time | 0 | 確認中 | - |
+
+          ### PHP 8.1 FPM Pool
+          | 項目 | 仕様 | 実際 | 状態 |
+          |------|------|------|------|
+          | user | nginx | 確認中 | - |
+          | group | nginx | 確認中 | - |
+          | pm | dynamic | 確認中 | - |
+          | pm.max_children | 50 | 確認中 | - |
+          | pm.start_servers | 5 | 確認中 | - |
+          | pm.min_spare_servers | 5 | 確認中 | - |
+          | pm.max_spare_servers | 35 | 確認中 | - |
+        dest: /Users/hironori/Work/sakura-server-pj/docs/test/php-config-check.md
+      run_once: true
+
+    - name: Display check completion
+      debug:
+        msg: "=== PHP設定確認完了 ==="

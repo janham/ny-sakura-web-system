@@ -1,0 +1,47 @@
+---
+# SSL証明書自動更新設定
+- name: Enable certbot renewal timer
+  systemd:
+    name: certbot-renew.timer
+    enabled: true
+    state: started
+  become: true
+  ignore_errors: true
+
+- name: Check if certbot timer exists
+  command: systemctl list-timers certbot-renew.timer
+  register: timer_check
+  changed_when: false
+  failed_when: false
+
+- name: Create certbot renewal cron job (fallback)
+  cron:
+    name: "Certbot automatic renewal"
+    job: "/usr/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'"
+    minute: "0"
+    hour: "3"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    user: root
+  when: timer_check.rc != 0
+  become: true
+
+- name: Test certbot renewal (dry-run)
+  command: certbot renew --dry-run
+  register: renewal_test
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Display renewal test result
+  debug:
+    msg: "Certbot renewal test: {{ 'SUCCESS' if renewal_test.rc == 0 else 'FAILED (will retry on actual renewal)' }}"
+
+- name: Display renewal configuration
+  debug:
+    msg: |
+      SSL certificate auto-renewal configured:
+      - Method: {{ 'systemd timer' if timer_check.rc == 0 else 'cron job' }}
+      - Schedule: Daily at 3:00 AM
+      - Post-hook: nginx reload

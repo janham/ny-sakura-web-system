@@ -1,0 +1,60 @@
+---
+# nginx HTTPS設定
+- name: Backup existing nginx configurations
+  copy:
+    src: "/etc/nginx/conf.d/{{ item }}.conf"
+    dest: "/etc/nginx/conf.d/{{ item }}.conf.backup-ssl"
+    remote_src: true
+    force: false
+  loop:
+    - supplier2
+    - portal2
+    - portal2-new
+  become: true
+  ignore_errors: true
+
+- name: Deploy SSL-enabled nginx configuration for supplier2
+  template:
+    src: supplier2-ssl.conf.j2
+    dest: /etc/nginx/conf.d/supplier2.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: restart nginx
+
+- name: Deploy SSL-enabled nginx configuration for portal2
+  template:
+    src: portal2-ssl.conf.j2
+    dest: /etc/nginx/conf.d/portal2.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: restart nginx
+
+- name: Deploy SSL-enabled nginx configuration for portal2-new
+  template:
+    src: portal2-new-ssl.conf.j2
+    dest: /etc/nginx/conf.d/portal2-new.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: restart nginx
+
+- name: Test nginx configuration
+  command: nginx -t
+  register: nginx_test
+  changed_when: false
+  become: true
+
+- name: Display nginx configuration test result
+  debug:
+    msg: "{{ nginx_test.stderr_lines }}"
+
+- name: Reload nginx to apply SSL configuration
+  systemd:
+    name: nginx
+    state: reloaded
+  become: true
