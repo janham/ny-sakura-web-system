@@ -1,0 +1,102 @@
+---
+# Configure Nginx for SSL
+- name: Configure Nginx with SSL settings
+  hosts: web
+  become: true
+
+  vars:
+    nginx_configs:
+      - file: supplier2.conf
+        domain: supplier2.mobileselection.jp
+      - file: portal2.conf
+        domain: portal2.mobileselection.jp
+      - file: portal2-new.conf
+        domain: portal2-new.mobileselection.jp
+
+  tasks:
+    - name: Backup Nginx configurations
+      copy:
+        src: "/etc/nginx/conf.d/{{ item.file }}"
+        dest: "/etc/nginx/conf.d/{{ item.file }}.backup-{{ ansible_date_time.epoch }}"
+        remote_src: true
+      loop: "{{ nginx_configs }}"
+
+    - name: Add SSL configuration to Nginx configs
+      blockinfile:
+        path: "/etc/nginx/conf.d/{{ item.file }}"
+        marker: "    # {mark} ANSIBLE MANAGED SSL CONFIG"
+        insertafter: "listen \\[::]:80;"
+        block: |2
+              listen 443 ssl http2;
+              listen [::]:443 ssl http2;
+
+              ssl_certificate /etc/letsencrypt/live/{{ item.domain }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ item.domain }}/privkey.pem;
+
+              # SSL configuration
+              ssl_protocols TLSv1.2 TLSv1.3;
+              ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+              ssl_prefer_server_ciphers on;
+              ssl_session_cache shared:SSL:10m;
+              ssl_session_timeout 10m;
+
+              # Security headers
+              add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+      loop: "{{ nginx_configs }}"
+
+    - name: Add HTTP to HTTPS redirect at the end of server block
+      blockinfile:
+        path: "/etc/nginx/conf.d/{{ item.file }}"
+        marker: "    # {mark} ANSIBLE MANAGED HTTP TO HTTPS REDIRECT"
+        insertbefore: "^}"
+        block: |2
+              # Redirect HTTP to HTTPS
+              if ($scheme = http) {
+                  return 301 https://$server_name$request_uri;
+              }
+      loop: "{{ nginx_configs }}"
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Display Nginx test result
+      debug:
+        msg: "{{ nginx_test.stderr_lines }}"
+
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
+      when: nginx_test.rc == 0
+
+    - name: Verify SSL certificates
+      command: "openssl x509 -in /etc/letsencrypt/live/{{ item.domain }}/fullchain.pem -noout -subject -issuer -dates"
+      loop: "{{ nginx_configs }}"
+      register: cert_info
+      changed_when: false
+
+    - name: Display certificate information
+      debug:
+        msg: "{{ item.item.domain }}: {{ item.stdout_lines }}"
+      loop: "{{ cert_info.results }}"
+      loop_control:
+        label: "{{ item.item.domain }}"
+
+    - name: Display completion summary
+      debug:
+        msg:
+          - "=========================================="
+          - "SSL設定完了"
+          - "=========================================="
+          - "設定されたドメイン:"
+          - "  - https://supplier2.mobileselection.jp"
+          - "  - https://portal2.mobileselection.jp"
+          - "  - https://portal2-new.mobileselection.jp"
+          - "=========================================="
+          - "HTTPからHTTPSへ自動リダイレクト設定済み"
+          - "=========================================="
