@@ -1,0 +1,83 @@
+---
+# /etc/hosts 更新 Playbook
+- name: Update /etc/hosts with appliance hostnames
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Backup /etc/hosts
+      copy:
+        src: /etc/hosts
+        dest: /etc/hosts.backup-{{ ansible_date_time.epoch }}
+        remote_src: true
+        mode: '0644'
+
+    - name: Add appliance entries to /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          # MariaDB Appliance
+          192.168.0.41    db-server
+
+          # NFS Appliance
+          192.168.0.30    nfs-server
+        marker: "# {mark} ANSIBLE MANAGED APPLIANCES"
+        backup: yes
+
+    - name: Display /etc/hosts content
+      command: cat /etc/hosts
+      register: hosts_content
+      changed_when: false
+
+    - name: Show /etc/hosts
+      debug:
+        msg: "{{ hosts_content.stdout_lines }}"
+
+    - name: Test hostname resolution - db-server
+      command: getent hosts db-server
+      register: db_server_test
+      changed_when: false
+
+    - name: Test hostname resolution - nfs-server
+      command: getent hosts nfs-server
+      register: nfs_server_test
+      changed_when: false
+
+    - name: Display resolution results
+      debug:
+        msg:
+          - "db-server: {{ db_server_test.stdout }}"
+          - "nfs-server: {{ nfs_server_test.stdout }}"
+
+    - name: Test MariaDB connection using hostname
+      command: mysql -h db-server -P 3306 -u faw43478 -p'{{ vault_db_default_password }}' -e "SELECT 'Connection OK' as status;"
+      register: db_connection_test
+      changed_when: false
+      no_log: true
+
+    - name: Display database connection test result
+      debug:
+        msg: "Database connection via hostname: {{ 'SUCCESS' if db_connection_test.rc == 0 else 'FAILED' }}"
+
+    - name: Test NFS mount accessibility
+      stat:
+        path: /mnt/shared
+      register: nfs_mount_test
+
+    - name: Display NFS test result
+      debug:
+        msg: "NFS mount accessible: {{ 'YES' if nfs_mount_test.stat.exists else 'NO' }}"
+
+    - name: Summary
+      debug:
+        msg:
+          - "=========================================="
+          - "/etc/hosts 設定完了"
+          - "=========================================="
+          - "追加されたエントリ:"
+          - "  192.168.0.41 -> db-server"
+          - "  192.168.0.30 -> nfs-server"
+          - "=========================================="
+          - "名前解決テスト: 成功"
+          - "データベース接続テスト: {{ '成功' if db_connection_test.rc == 0 else '失敗' }}"
+          - "=========================================="
