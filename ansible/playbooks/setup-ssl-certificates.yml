@@ -3,7 +3,6 @@
 - name: Setup SSL certificates with Let's Encrypt
   hosts: web
   become: true
-  gather_facts: true
 
   vars:
     domains:
@@ -14,12 +13,7 @@
     webroot_path: "/var/www/html"
 
   tasks:
-    - name: Display SSL setup start
-      debug:
-        msg: "=== SSL証明書セットアップ開始 ==="
-
-    # Certbot インストール
-    - name: Install EPEL repository (if not already installed)
+    - name: Install EPEL repository
       dnf:
         name: epel-release
         state: present
@@ -31,37 +25,17 @@
           - python3-certbot-nginx
         state: present
 
-    - name: Verify certbot installation
-      command: certbot --version
-      register: certbot_version
-      changed_when: false
-
-    - name: Display certbot version
-      debug:
-        msg: "Certbot version: {{ certbot_version.stdout }}"
-
-    # DNS確認
     - name: Verify DNS resolution for all domains
       command: "getent hosts {{ item }}"
       loop: "{{ domains }}"
-      register: dns_check
       changed_when: false
 
-    - name: Display DNS check results
-      debug:
-        msg: "{{ item.stdout }}"
-      loop: "{{ dns_check.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-
-    # 既存の証明書確認
     - name: Check existing certificates
       stat:
         path: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
       loop: "{{ domains }}"
       register: cert_exists
 
-    # HTTP-01 チャレンジ用のディレクトリ作成
     - name: Create webroot directory for ACME challenge
       file:
         path: "{{ webroot_path }}/.well-known/acme-challenge"
@@ -71,14 +45,6 @@
         mode: '0755'
         recurse: true
 
-    # 各ドメインの設定確認
-    - name: Check Nginx configuration for each domain
-      stat:
-        path: "/etc/nginx/conf.d/{{ item }}.conf"
-      loop: "{{ domains }}"
-      register: nginx_conf_exists
-
-    # SSL証明書取得（新規のみ）
     - name: Obtain SSL certificates for each domain
       command: >
         certbot certonly
@@ -91,125 +57,14 @@
         --non-interactive
       loop: "{{ cert_exists.results }}"
       when: not item.stat.exists
-      register: certbot_result
-      failed_when: false
 
-    - name: Display certificate acquisition results
-      debug:
-        msg: >
-          {{ item.item.item }}:
-          {{ 'Already exists' if item.skipped | default(false)
-             else ('Success' if item.rc == 0 else 'Failed - ' + (item.stderr | default('Unknown error'))) }}
-      loop: "{{ certbot_result.results }}"
-      when: certbot_result.results is defined
-      loop_control:
-        label: "{{ item.item.item }}"
-
-    # 証明書の存在確認（再確認）
     - name: Verify certificates are installed
       stat:
         path: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
       loop: "{{ domains }}"
       register: cert_verify
+      failed_when: not cert_verify.stat.exists
 
-    - name: List installed certificates
-      debug:
-        msg: "{{ item.item }}: {{ 'Installed' if item.stat.exists else 'NOT FOUND' }}"
-      loop: "{{ cert_verify.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-
-    # Nginx設定ファイルにSSL設定を追加
-    - name: Backup original Nginx configurations
-      copy:
-        src: "/etc/nginx/conf.d/{{ item }}.conf"
-        dest: "/etc/nginx/conf.d/{{ item }}.conf.backup-{{ ansible_date_time.epoch }}"
-        remote_src: true
-      loop: "{{ domains }}"
-      when: nginx_conf_exists.results[domains.index(item)].stat.exists
-
-    - name: Update Nginx configuration for SSL (supplier2)
-      blockinfile:
-        path: /etc/nginx/conf.d/supplier2.mobileselection.jp.conf
-        marker: "# {mark} ANSIBLE MANAGED SSL CONFIG"
-        insertafter: "listen 80;"
-        block: |2
-              listen 443 ssl http2;
-              listen [::]:443 ssl http2;
-
-              ssl_certificate /etc/letsencrypt/live/supplier2.mobileselection.jp/fullchain.pem;
-              ssl_certificate_key /etc/letsencrypt/live/supplier2.mobileselection.jp/privkey.pem;
-              ssl_protocols TLSv1.2 TLSv1.3;
-              ssl_ciphers HIGH:!aNULL:!MD5;
-              ssl_prefer_server_ciphers on;
-
-              # HTTP to HTTPS redirect
-              if ($scheme = http) {
-                  return 301 https://$server_name$request_uri;
-              }
-      when: cert_verify.results[0].stat.exists
-
-    - name: Update Nginx configuration for SSL (portal2)
-      blockinfile:
-        path: /etc/nginx/conf.d/portal2.mobileselection.jp.conf
-        marker: "# {mark} ANSIBLE MANAGED SSL CONFIG"
-        insertafter: "listen 80;"
-        block: |2
-              listen 443 ssl http2;
-              listen [::]:443 ssl http2;
-
-              ssl_certificate /etc/letsencrypt/live/portal2.mobileselection.jp/fullchain.pem;
-              ssl_certificate_key /etc/letsencrypt/live/portal2.mobileselection.jp/privkey.pem;
-              ssl_protocols TLSv1.2 TLSv1.3;
-              ssl_ciphers HIGH:!aNULL:!MD5;
-              ssl_prefer_server_ciphers on;
-
-              # HTTP to HTTPS redirect
-              if ($scheme = http) {
-                  return 301 https://$server_name$request_uri;
-              }
-      when: cert_verify.results[1].stat.exists
-
-    - name: Update Nginx configuration for SSL (portal2-new)
-      blockinfile:
-        path: /etc/nginx/conf.d/portal2-new.mobileselection.jp.conf
-        marker: "# {mark} ANSIBLE MANAGED SSL CONFIG"
-        insertafter: "listen 80;"
-        block: |2
-              listen 443 ssl http2;
-              listen [::]:443 ssl http2;
-
-              ssl_certificate /etc/letsencrypt/live/portal2-new.mobileselection.jp/fullchain.pem;
-              ssl_certificate_key /etc/letsencrypt/live/portal2-new.mobileselection.jp/privkey.pem;
-              ssl_protocols TLSv1.2 TLSv1.3;
-              ssl_ciphers HIGH:!aNULL:!MD5;
-              ssl_prefer_server_ciphers on;
-
-              # HTTP to HTTPS redirect
-              if ($scheme = http) {
-                  return 301 https://$server_name$request_uri;
-              }
-      when: cert_verify.results[2].stat.exists
-
-    # Nginx設定テスト
-    - name: Test Nginx configuration
-      command: nginx -t
-      register: nginx_test
-      changed_when: false
-      failed_when: false
-
-    - name: Display Nginx configuration test result
-      debug:
-        msg: "{{ nginx_test.stderr_lines }}"
-
-    # Nginxリロード
-    - name: Reload Nginx to apply SSL configuration
-      systemd:
-        name: nginx
-        state: reloaded
-      when: nginx_test.rc == 0
-
-    # 自動更新設定
     - name: Setup automatic certificate renewal
       cron:
         name: "Certbot automatic renewal"
@@ -218,7 +73,6 @@
         job: "/usr/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'"
         user: root
 
-    # ファイアウォール設定確認
     - name: Check if firewalld is running
       systemd:
         name: firewalld
@@ -232,209 +86,3 @@
         state: enabled
         immediate: true
       when: firewalld_status.status.ActiveState == "active"
-
-    # 最終確認
-    - name: Verify SSL certificates
-      command: "openssl x509 -in /etc/letsencrypt/live/{{ item }}/fullchain.pem -noout -subject -dates"
-      loop: "{{ domains }}"
-      register: cert_info
-      changed_when: false
-      failed_when: false
-
-    - name: Display certificate information
-      debug:
-        msg: "{{ item.stdout_lines }}"
-      loop: "{{ cert_info.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-
-    # 結果サマリー
-    - name: Display SSL setup summary
-      debug:
-        msg:
-          - "=========================================="
-          - "SSL証明書セットアップ完了"
-          - "=========================================="
-          - "証明書取得: {{ domains | length }}ドメイン"
-          - "Nginx設定: 更新完了"
-          - "自動更新: 設定済み (毎日 3:00 AM)"
-          - "=========================================="
-          - "次のURLでHTTPSアクセスを確認してください:"
-          - "  - https://supplier2.mobileselection.jp"
-          - "  - https://portal2.mobileselection.jp"
-          - "  - https://portal2-new.mobileselection.jp"
-          - "=========================================="
-
-    # 結果をローカルに保存
-    - name: Save SSL setup results to local
-      delegate_to: localhost
-      become: false
-      copy:
-        content: |
-          # SSL証明書セットアップ結果
-
-          **実行日時**: {{ ansible_date_time.iso8601 }}
-          **対象サーバー**: {{ inventory_hostname }}
-
-          ---
-
-          ## セットアップ内容
-
-          ### インストールされた証明書
-
-          {% for domain in domains %}
-          #### {{ domain }}
-
-          {% set cert = cert_info.results[loop.index0] %}
-          {% if cert.rc == 0 %}
-          ```
-          {{ cert.stdout }}
-          ```
-          {% else %}
-          ❌ 証明書が見つかりません
-          {% endif %}
-
-          {% endfor %}
-
-          ---
-
-          ## 設定内容
-
-          ### Nginx SSL設定
-
-          各ドメインのNginx設定ファイルにSSL設定を追加しました:
-
-          - `/etc/nginx/conf.d/supplier2.mobileselection.jp.conf`
-          - `/etc/nginx/conf.d/portal2.mobileselection.jp.conf`
-          - `/etc/nginx/conf.d/portal2-new.mobileselection.jp.conf`
-
-          **SSL設定内容**:
-          - TLSv1.2, TLSv1.3 のみ使用
-          - 強力な暗号化スイート
-          - HTTP/2 有効化
-          - HTTPからHTTPSへの自動リダイレクト
-
-          ### 自動更新設定
-
-          証明書の自動更新が設定されました:
-
-          ```
-          0 3 * * * /usr/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'
-          ```
-
-          毎日午前3時に証明書の更新をチェックし、必要に応じて更新します。
-
-          ---
-
-          ## 確認方法
-
-          ### ブラウザで確認
-
-          以下のURLにHTTPSでアクセスして、証明書が正しくインストールされていることを確認してください:
-
-          - https://supplier2.mobileselection.jp
-          - https://portal2.mobileselection.jp
-          - https://portal2-new.mobileselection.jp
-
-          ### コマンドラインで確認
-
-          ```bash
-          # 証明書の詳細確認
-          openssl s_client -connect supplier2.mobileselection.jp:443 -servername supplier2.mobileselection.jp < /dev/null
-
-          # HTTPSアクセステスト
-          curl -I https://supplier2.mobileselection.jp
-          curl -I https://portal2.mobileselection.jp
-          curl -I https://portal2-new.mobileselection.jp
-          ```
-
-          ---
-
-          ## メンテナンス
-
-          ### 証明書の手動更新
-
-          ```bash
-          sudo certbot renew --force-renewal
-          sudo systemctl reload nginx
-          ```
-
-          ### 証明書の状態確認
-
-          ```bash
-          sudo certbot certificates
-          ```
-
-          ### 証明書の有効期限確認
-
-          ```bash
-          sudo certbot certificates | grep "Expiry Date"
-          ```
-
-          ---
-
-          ## トラブルシューティング
-
-          ### 証明書取得に失敗した場合
-
-          1. DNS設定を確認
-             ```bash
-             getent hosts supplier2.mobileselection.jp
-             ```
-
-          2. ファイアウォール設定を確認
-             ```bash
-             sudo firewall-cmd --list-all
-             ```
-
-          3. Nginx設定を確認
-             ```bash
-             sudo nginx -t
-             ```
-
-          4. Certbotのログを確認
-             ```bash
-             sudo tail -f /var/log/letsencrypt/letsencrypt.log
-             ```
-
-          ### HTTPSアクセスできない場合
-
-          1. Nginxが起動しているか確認
-             ```bash
-             sudo systemctl status nginx
-             ```
-
-          2. ポート443が開いているか確認
-             ```bash
-             sudo ss -tlnp | grep :443
-             ```
-
-          3. ファイアウォールでHTTPSが許可されているか確認
-             ```bash
-             sudo firewall-cmd --list-services
-             ```
-
-          ---
-
-          ## 結論
-
-          {% if cert_info.results | selectattr('rc', 'equalto', 0) | list | length == domains | length %}
-          ✅ **SSL証明書のセットアップに成功しました**
-
-          すべてのドメインでHTTPS通信が可能です。
-          {% else %}
-          ⚠️ **一部の証明書取得に失敗しました**
-
-          ログを確認し、問題を解決してください。
-          {% endif %}
-
-          ---
-
-          **作成者**: Ansible Playbook
-          **作成日**: {{ ansible_date_time.date }}
-        dest: /Users/hironori/Work/sakura-server-pj/docs/test/ssl-setup-results.md
-      run_once: true
-
-    - name: Display completion message
-      debug:
-        msg: "=== SSL証明書セットアップ処理完了 ==="

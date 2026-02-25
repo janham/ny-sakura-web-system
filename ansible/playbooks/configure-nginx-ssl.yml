@@ -61,42 +61,16 @@
 
     - name: Test Nginx configuration
       command: nginx -t
-      register: nginx_test
       changed_when: false
-
-    - name: Display Nginx test result
-      debug:
-        msg: "{{ nginx_test.stderr_lines }}"
 
     - name: Reload Nginx
       systemd:
         name: nginx
         state: reloaded
-      when: nginx_test.rc == 0
 
-    - name: Verify SSL certificates
-      command: "openssl x509 -in /etc/letsencrypt/live/{{ item.domain }}/fullchain.pem -noout -subject -issuer -dates"
+    - name: Verify SSL certificates are readable
+      stat:
+        path: "/etc/letsencrypt/live/{{ item.domain }}/fullchain.pem"
       loop: "{{ nginx_configs }}"
-      register: cert_info
-      changed_when: false
-
-    - name: Display certificate information
-      debug:
-        msg: "{{ item.item.domain }}: {{ item.stdout_lines }}"
-      loop: "{{ cert_info.results }}"
-      loop_control:
-        label: "{{ item.item.domain }}"
-
-    - name: Display completion summary
-      debug:
-        msg:
-          - "=========================================="
-          - "SSL設定完了"
-          - "=========================================="
-          - "設定されたドメイン:"
-          - "  - https://supplier2.mobileselection.jp"
-          - "  - https://portal2.mobileselection.jp"
-          - "  - https://portal2-new.mobileselection.jp"
-          - "=========================================="
-          - "HTTPからHTTPSへ自動リダイレクト設定済み"
-          - "=========================================="
+      register: cert_check
+      failed_when: not cert_check.stat.exists

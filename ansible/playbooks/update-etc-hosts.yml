@@ -24,60 +24,21 @@
         marker: "# {mark} ANSIBLE MANAGED APPLIANCES"
         backup: yes
 
-    - name: Display /etc/hosts content
-      command: cat /etc/hosts
-      register: hosts_content
-      changed_when: false
-
-    - name: Show /etc/hosts
-      debug:
-        msg: "{{ hosts_content.stdout_lines }}"
-
     - name: Test hostname resolution - db-server
       command: getent hosts db-server
-      register: db_server_test
       changed_when: false
 
     - name: Test hostname resolution - nfs-server
       command: getent hosts nfs-server
-      register: nfs_server_test
       changed_when: false
-
-    - name: Display resolution results
-      debug:
-        msg:
-          - "db-server: {{ db_server_test.stdout }}"
-          - "nfs-server: {{ nfs_server_test.stdout }}"
 
     - name: Test MariaDB connection using hostname
-      command: mysql -h db-server -P 3306 -u faw43478 -p'{{ vault_db_default_password }}' -e "SELECT 'Connection OK' as status;"
-      register: db_connection_test
+      command: mysql -h db-server -P 3306 -u faw43478 -p'{{ vault_db_default_password }}' -e "SELECT 1"
       changed_when: false
       no_log: true
-
-    - name: Display database connection test result
-      debug:
-        msg: "Database connection via hostname: {{ 'SUCCESS' if db_connection_test.rc == 0 else 'FAILED' }}"
 
     - name: Test NFS mount accessibility
       stat:
         path: /mnt/shared
       register: nfs_mount_test
-
-    - name: Display NFS test result
-      debug:
-        msg: "NFS mount accessible: {{ 'YES' if nfs_mount_test.stat.exists else 'NO' }}"
-
-    - name: Summary
-      debug:
-        msg:
-          - "=========================================="
-          - "/etc/hosts 設定完了"
-          - "=========================================="
-          - "追加されたエントリ:"
-          - "  192.168.0.41 -> db-server"
-          - "  192.168.0.30 -> nfs-server"
-          - "=========================================="
-          - "名前解決テスト: 成功"
-          - "データベース接続テスト: {{ '成功' if db_connection_test.rc == 0 else '失敗' }}"
-          - "=========================================="
+      failed_when: not nfs_mount_test.stat.exists

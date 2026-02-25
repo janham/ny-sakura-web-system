@@ -33,39 +33,10 @@
         - ssh
         - permissions
 
-    - name: Check rsync version
+    - name: Verify rsync installation
       command: rsync --version
-      register: rsync_version
+      register: rsync_check
       changed_when: false
-      tags:
-        - verification
-
-    - name: Check SSH version
-      command: ssh -V
-      register: ssh_version
-      changed_when: false
-      failed_when: false
-      tags:
-        - verification
-
-    - name: Display installed versions
-      debug:
-        msg:
-          - "=========================================="
-          - "rsync/scp 環境セットアップ完了"
-          - "=========================================="
-          - "インストール済みパッケージ:"
-          - "  rsync: {{ rsync_version.stdout_lines[0] }}"
-          - "  SSH: {{ ssh_version.stderr_lines[0] }}"
-          - "=========================================="
-          - ".ssh ディレクトリ: /home/gsuser/.ssh (700)"
-          - "=========================================="
-          - "次のステップ:"
-          - "  1. SSH秘密鍵の配置"
-          - "  2. SSH接続テスト"
-          - "  3. rsync/scp 動作テスト"
-          - "=========================================="
-          - "詳細: /docs/migration/ssh-key-setup-guide.md"
-          - "=========================================="
+      failed_when: rsync_check.rc != 0
       tags:
         - verification

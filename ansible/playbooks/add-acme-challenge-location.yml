@@ -27,36 +27,9 @@
 
     - name: Test Nginx configuration
       command: nginx -t
-      register: nginx_test
       changed_when: false
-
-    - name: Display Nginx test result
-      debug:
-        msg: "{{ nginx_test.stderr_lines }}"
 
     - name: Reload Nginx
       systemd:
         name: nginx
         state: reloaded
-      when: nginx_test.rc == 0
-
-    - name: Test ACME challenge directory accessibility
-      uri:
-        url: "http://{{ item }}/.well-known/acme-challenge/test"
-        status_code: [200, 404]
-        return_content: false
-      loop:
-        - supplier2.mobileselection.jp
-        - portal2.mobileselection.jp
-        - portal2-new.mobileselection.jp
-      register: acme_test
-      failed_when: false
-      delegate_to: localhost
-      become: false
-
-    - name: Display ACME challenge test results
-      debug:
-        msg: "{{ item.item }}: {{ item.status if item.status is defined else 'Connection failed' }}"
-      loop: "{{ acme_test.results }}"
-      loop_control:
-        label: "{{ item.item }}"
