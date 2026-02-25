@@ -1,0 +1,71 @@
+---
+# rsync/scp 環境セットアップ Playbook
+# 旧サーバーからのデータ移行準備
+- name: Setup rsync and SSH environment for data migration
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Install rsync package
+      dnf:
+        name: rsync
+        state: present
+      tags:
+        - packages
+        - rsync
+
+    - name: Verify openssh-clients is installed
+      dnf:
+        name: openssh-clients
+        state: present
+      tags:
+        - packages
+        - ssh
+
+    - name: Ensure .ssh directory exists with correct permissions
+      file:
+        path: /home/gsuser/.ssh
+        state: directory
+        owner: gsuser
+        group: gsuser
+        mode: '0700'
+      tags:
+        - ssh
+        - permissions
+
+    - name: Check rsync version
+      command: rsync --version
+      register: rsync_version
+      changed_when: false
+      tags:
+        - verification
+
+    - name: Check SSH version
+      command: ssh -V
+      register: ssh_version
+      changed_when: false
+      failed_when: false
+      tags:
+        - verification
+
+    - name: Display installed versions
+      debug:
+        msg:
+          - "=========================================="
+          - "rsync/scp 環境セットアップ完了"
+          - "=========================================="
+          - "インストール済みパッケージ:"
+          - "  rsync: {{ rsync_version.stdout_lines[0] }}"
+          - "  SSH: {{ ssh_version.stderr_lines[0] }}"
+          - "=========================================="
+          - ".ssh ディレクトリ: /home/gsuser/.ssh (700)"
+          - "=========================================="
+          - "次のステップ:"
+          - "  1. SSH秘密鍵の配置"
+          - "  2. SSH接続テスト"
+          - "  3. rsync/scp 動作テスト"
+          - "=========================================="
+          - "詳細: /docs/migration/ssh-key-setup-guide.md"
+          - "=========================================="
+      tags:
+        - verification
