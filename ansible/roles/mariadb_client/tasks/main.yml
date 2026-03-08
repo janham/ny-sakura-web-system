@@ -15,6 +15,7 @@
   tags:
     - mariadb_client
     - databases
+  when: server_type == 'web'
 
 - name: Display mariadb_client role completion
   debug:

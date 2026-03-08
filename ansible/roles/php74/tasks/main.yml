@@ -33,6 +33,7 @@
   tags:
     - php74
     - fpm
+  when: server_type == 'web'
 
 - name: Display php74 role completion
   debug:

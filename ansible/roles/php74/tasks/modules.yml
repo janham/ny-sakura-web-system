@@ -1,8 +1,14 @@
 ---
 # PHP 7.4 拡張モジュールインストール
-- name: Install required PHP 7.4 extensions
-  dnf:
-    name:
+- name: Install PHP 7.4 extensions using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: php74-extensions
+    offline_temp_dir: /tmp/php74-extensions-packages
+    package_names:
       - php74-php-pdo
       - php74-php-mysqlnd
       - php74-php-pgsql
@@ -15,28 +21,8 @@
       - php74-php-json
       - php74-php-intl
       - php74-php-soap
-    state: present
-    enablerepo: remi
-  become: true
-
-- name: Install additional PHP 7.4 extensions
-  dnf:
-    name:
       - php74-php-process
       - php74-php-pecl-apcu
-      - php74-php-mcrypt
-    state: present
-    enablerepo: remi
-  become: true
-  ignore_errors: true
-
-- name: Install mecab extension (if available)
-  dnf:
-    name: php74-php-mecab
-    state: present
-    enablerepo: remi
-  become: true
-  ignore_errors: true
 
 - name: Verify installed PHP 7.4 modules
   command: /opt/remi/php74/root/usr/bin/php -m

@@ -4,21 +4,28 @@
   command: dnf module disable php -y
   become: true
   changed_when: false
+  when: server_type == 'web'
 
 - name: Enable PHP 8.1 module
   command: dnf module enable php:8.1 -y
   become: true
   register: php_module_enable
   changed_when: "'Enabling module streams' in php_module_enable.stdout"
+  when: server_type == 'web'
 
-- name: Install PHP 8.1 core packages
-  dnf:
-    name:
+- name: Install PHP 8.1 core packages using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: php81-core
+    offline_temp_dir: /tmp/php81-core-packages
+    package_names:
       - php
       - php-cli
       - php-fpm
-    state: present
-  become: true
+      - php-common
 
 - name: Verify PHP installation
   command: php -v
@@ -28,3 +35,4 @@
 - name: Display PHP version
   debug:
     msg: "{{ php_version.stdout_lines[0] }}"
+  when: php_version.stdout_lines is defined and php_version.stdout_lines | length > 0

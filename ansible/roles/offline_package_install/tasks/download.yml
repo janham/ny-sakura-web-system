@@ -1,0 +1,59 @@
+---
+# Download packages on proxy server (with internet access)
+
+- name: Clean up old package directory on proxy server
+  file:
+    path: "{{ offline_temp_dir }}"
+    state: absent
+  become: true
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+
+- name: Create package directory on proxy server
+  file:
+    path: "{{ offline_temp_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+
+- name: Download packages with dependencies
+  shell: |
+    cd {{ offline_temp_dir }}
+    dnf download --resolve {{ package_names | join(' ') }}
+  become: true
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+  register: dnf_download
+  changed_when: "'Downloaded' in dnf_download.stdout or 'Downloading' in dnf_download.stdout"
+
+- name: Display download result
+  debug:
+    msg: "Downloaded {{ (dnf_download.stdout_lines | select('match', '.*\\.rpm$') | list | length) }} packages"
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+
+- name: Create archive of downloaded packages
+  archive:
+    path: "{{ offline_temp_dir }}"
+    dest: "{{ offline_temp_dir }}.tar.gz"
+    format: gz
+  become: true
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+
+- name: Get archive file info
+  stat:
+    path: "{{ offline_temp_dir }}.tar.gz"
+  register: archive_info
+  become: true
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+
+- name: Display archive size
+  debug:
+    msg: "Archive size: {{ (archive_info.stat.size / 1024 / 1024) | round(2) }} MB"
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+  when: archive_info.stat is defined and archive_info.stat.size is defined

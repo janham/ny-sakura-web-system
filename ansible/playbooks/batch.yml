@@ -1,0 +1,31 @@
+---
+- name: Build Batch Server
+  hosts: batch
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display playbook start
+      debug:
+        msg: "Starting Batch Server build for {{ inventory_hostname }}"
+
+  roles:
+    - role: common
+      tags: [common, phase1]
+
+    - role: mariadb_client
+      tags: [mariadb_client, phase2]
+
+    - role: nfs
+      tags: [nfs, phase3]
+
+    - role: php81
+      tags: [php81, phase4]
+
+    - role: php74
+      tags: [php74, phase5]
+
+  post_tasks:
+    - name: Display playbook completion
+      debug:
+        msg: "Batch Server build completed successfully"

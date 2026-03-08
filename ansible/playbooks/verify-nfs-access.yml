@@ -1,0 +1,69 @@
+---
+# NFS アクセス検証 Playbook
+- name: Verify NFS mount and access from Ansible
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Check if NFS is mounted
+      shell: mount | grep 192.168.0.30
+      register: nfs_mount_check
+      changed_when: false
+
+    - name: Verify mount point exists
+      stat:
+        path: /mnt/shared
+      register: mount_point
+
+    - name: Check NFS mount in fstab
+      shell: grep '192.168.0.30' /etc/fstab
+      register: fstab_check
+      changed_when: false
+
+    - name: Get NFS disk usage
+      shell: df -h /mnt/shared
+      register: nfs_usage
+      changed_when: false
+
+    - name: List apps directory
+      shell: ls -la /mnt/shared/apps/
+      register: apps_dir
+      changed_when: false
+
+    - name: Test write permission (create test file)
+      file:
+        path: /mnt/shared/apps/.ansible_test
+        state: touch
+        owner: nginx
+        group: nginx
+        mode: '0644'
+      register: write_test
+
+    - name: Verify test file was created
+      stat:
+        path: /mnt/shared/apps/.ansible_test
+      register: test_file_stat
+
+    - name: Remove test file
+      file:
+        path: /mnt/shared/apps/.ansible_test
+        state: absent
+
+    - name: Test directory creation
+      file:
+        path: /mnt/shared/apps/.ansible_test_dir
+        state: directory
+        owner: nginx
+        group: nginx
+        mode: '0755'
+
+    - name: Remove test directory
+      file:
+        path: /mnt/shared/apps/.ansible_test_dir
+        state: absent
+
+    - name: Verify NFS statistics
+      shell: nfsstat -m | grep -A 10 '/mnt/shared'
+      register: nfs_stats
+      changed_when: false
+      failed_when: false

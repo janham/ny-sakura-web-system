@@ -1,0 +1,54 @@
+---
+# Install packages from local RPM files on target server
+
+- name: Get list of RPM files
+  find:
+    paths: "/tmp/{{ offline_temp_dir | basename }}"
+    patterns: "*.rpm"
+  register: rpm_files
+  become: true
+
+- name: Display packages to install
+  debug:
+    msg: "Installing {{ rpm_files.files | length }} packages"
+
+- name: Install packages from local RPM files
+  shell: |
+    for rpm in /tmp/{{ offline_temp_dir | basename }}/*.rpm; do
+      rpm -Uvh {{ '--nodeps' if offline_install_nodeps else '' }} "$rpm" 2>&1 || true
+    done
+  become: true
+  register: rpm_install
+  changed_when: "'Installing' in rpm_install.stdout or 'Upgrading' in rpm_install.stdout"
+
+- name: Display installation result
+  debug:
+    msg: "{{ rpm_install.stdout_lines | select('match', '.*(Installing|Upgrading|already installed).*') | list }}"
+  when: rpm_install.stdout_lines is defined
+
+- name: Clean up temporary files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/{{ offline_package_name }}.tar.gz"
+    - "/tmp/{{ offline_temp_dir | basename }}"
+  become: true
+  when: offline_cleanup | default(true)
+
+- name: Clean up on proxy server
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ offline_temp_dir }}.tar.gz"
+    - "{{ offline_temp_dir }}"
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+  become: true
+  when: offline_cleanup | default(true)
+
+- name: Display cleanup status
+  debug:
+    msg: "Cleanup completed"
+  when: offline_cleanup | default(true)

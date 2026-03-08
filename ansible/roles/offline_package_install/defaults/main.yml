@@ -1,0 +1,21 @@
+---
+# Offline package installation default variables
+
+# Enable offline mode (should be set in group_vars)
+offline_mode: false
+
+# Proxy server to download packages from (must have internet access)
+offline_proxy_server: gs-web
+
+# Temporary directory for package download on proxy server
+offline_temp_dir: /tmp/offline-packages
+
+# Package archive name (should be unique per package set)
+offline_package_name: packages
+
+# List of packages to install (required)
+package_names: []
+
+# Install options
+offline_install_nodeps: true
+offline_cleanup: true

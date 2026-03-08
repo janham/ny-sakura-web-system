@@ -1,0 +1,75 @@
+---
+# gsmngdb データベースとユーザー作成 Playbook
+- name: Create gsmngdb database and user
+  hosts: web
+  become: true
+
+  vars:
+    db_host: "db-server"
+    db_port: 3306
+    admin_user: "faw43478"
+    admin_password: "{{ vault_db_default_password }}"
+    new_db_name: "gsmngdb"
+    new_db_charset: "utf8mb4"
+    new_user: "gsmng"
+    new_password: "Gsmng@2026!"
+
+  tasks:
+    - name: Install PyMySQL for mysql_* modules
+      dnf:
+        name: python3-PyMySQL
+        state: present
+
+    - name: Create database gsmngdb
+      mysql_db:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ admin_user }}"
+        login_password: "{{ admin_password }}"
+        name: "{{ new_db_name }}"
+        encoding: "{{ new_db_charset }}"
+        state: present
+
+    - name: Create user gsmng with SQL query
+      mysql_query:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ admin_user }}"
+        login_password: "{{ admin_password }}"
+        query: "CREATE USER IF NOT EXISTS '{{ new_user }}'@'%' IDENTIFIED BY '{{ new_password }}'"
+      register: user_create
+
+    - name: Grant all privileges on gsmngdb to gsmng
+      mysql_query:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ admin_user }}"
+        login_password: "{{ admin_password }}"
+        query: "GRANT ALL PRIVILEGES ON {{ new_db_name }}.* TO '{{ new_user }}'@'%'"
+
+    - name: Flush privileges
+      mysql_query:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ admin_user }}"
+        login_password: "{{ admin_password }}"
+        query: "FLUSH PRIVILEGES"
+
+    - name: Verify database creation
+      mysql_query:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ admin_user }}"
+        login_password: "{{ admin_password }}"
+        query: "SHOW CREATE DATABASE {{ new_db_name }}"
+      register: db_check
+
+    - name: Verify user can connect to database
+      mysql_query:
+        login_host: "{{ db_host }}"
+        login_port: "{{ db_port }}"
+        login_user: "{{ new_user }}"
+        login_password: "{{ new_password }}"
+        query: "SELECT 1"
+        login_db: "{{ new_db_name }}"
+      register: user_check

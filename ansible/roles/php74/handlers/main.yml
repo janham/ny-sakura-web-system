@@ -5,9 +5,11 @@
     name: php74-php-fpm
     state: restarted
   become: true
+  when: server_type == 'web'
 
 - name: reload php74-php-fpm
   systemd:
     name: php74-php-fpm
     state: reloaded
   become: true
+  when: server_type == 'web'

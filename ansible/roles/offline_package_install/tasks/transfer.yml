@@ -1,0 +1,45 @@
+---
+# Transfer packages from proxy server to target server via local machine
+
+- name: Fetch package archive from proxy server to local machine
+  fetch:
+    src: "{{ offline_temp_dir }}.tar.gz"
+    dest: "/tmp/{{ offline_package_name }}.tar.gz"
+    flat: yes
+  delegate_to: "{{ offline_proxy_server }}"
+  run_once: true
+  become: true
+  register: fetch_result
+
+- name: Display transfer status
+  debug:
+    msg: "Fetched archive from {{ offline_proxy_server }}, uploading to {{ inventory_hostname }}"
+  when: not fetch_result.skipped | default(false)
+
+- name: Upload package archive to target server
+  copy:
+    src: "/tmp/{{ offline_package_name }}.tar.gz"
+    dest: "/tmp/{{ offline_package_name }}.tar.gz"
+    mode: '0644'
+  become: true
+  when: not fetch_result.skipped | default(false)
+
+- name: Extract package archive on target server
+  unarchive:
+    src: "/tmp/{{ offline_package_name }}.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+  become: true
+  when: not fetch_result.skipped | default(false)
+
+- name: List extracted packages
+  shell: ls -1 /tmp/{{ offline_temp_dir | basename }}/*.rpm | wc -l
+  register: package_count
+  changed_when: false
+  become: true
+  when: not fetch_result.skipped | default(false)
+
+- name: Display package count
+  debug:
+    msg: "Extracted {{ package_count.stdout }} package files"
+  when: package_count is defined and not package_count.skipped | default(false)

@@ -1,8 +1,14 @@
 ---
 # PHP 8.1 拡張モジュールインストール
-- name: Install required PHP extensions
-  dnf:
-    name:
+- name: Install required PHP extensions using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: php81-extensions
+    offline_temp_dir: /tmp/php81-extensions-packages
+    package_names:
       - php-pdo
       - php-mysqlnd
       - php-mbstring
@@ -14,17 +20,8 @@
       - php-json
       - php-intl
       - php-soap
-    state: present
-  become: true
-
-- name: Install additional useful PHP extensions
-  dnf:
-    name:
       - php-process
       - php-pecl-apcu
-    state: present
-  become: true
-  ignore_errors: true
 
 - name: Verify installed PHP modules
   command: php -m

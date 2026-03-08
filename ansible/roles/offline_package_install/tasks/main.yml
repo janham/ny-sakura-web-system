@@ -1,0 +1,26 @@
+---
+# Main task file for offline package installation
+
+- name: Display package installation mode
+  debug:
+    msg: "Installing packages: {{ package_names | join(', ') }} (Mode: {{ 'offline' if offline_mode else 'online' }})"
+
+- name: Install packages in offline mode
+  block:
+    - name: Download packages on proxy server
+      include_tasks: download.yml
+
+    - name: Transfer packages to target server
+      include_tasks: transfer.yml
+
+    - name: Install packages on target server
+      include_tasks: install.yml
+
+  when: offline_mode | default(false)
+
+- name: Install packages in online mode
+  dnf:
+    name: "{{ package_names }}"
+    state: present
+  become: true
+  when: not (offline_mode | default(false))

@@ -1,0 +1,10 @@
+---
+# Batch server specific variables
+server_type: batch
+
+# NFS directory ownership
+nfs_apps_owner: gsuser
+nfs_apps_group: gsuser
+
+# System update control
+common_system_update: false

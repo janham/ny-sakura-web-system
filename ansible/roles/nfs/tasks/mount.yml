@@ -1,11 +1,15 @@
 ---
 # NFS マウント設定
-- name: Install NFS utilities
-  dnf:
-    name:
+- name: Install NFS utilities using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: nfs-utils
+    offline_temp_dir: /tmp/nfs-packages
+    package_names:
       - nfs-utils
-    state: present
-  become: true
 
 - name: Create NFS mount point directory
   file:
@@ -38,8 +42,8 @@
   file:
     path: "{{ nfs_mount_point }}/apps"
     state: directory
-    owner: nginx
-    group: nginx
+    owner: "{{ nfs_apps_owner }}"
+    group: "{{ nfs_apps_group }}"
     mode: '0775'
   become: true
 
@@ -47,8 +51,8 @@
   file:
     path: "{{ nfs_mount_point }}/apps/test_ansible_write"
     state: touch
-    owner: nginx
-    group: nginx
+    owner: "{{ nfs_apps_owner }}"
+    group: "{{ nfs_apps_group }}"
     mode: '0644'
   become: true
   register: nfs_write_test

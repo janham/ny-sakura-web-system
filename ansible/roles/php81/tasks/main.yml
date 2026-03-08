@@ -27,6 +27,7 @@
   tags:
     - php81
     - fpm
+  when: server_type == 'web'
 
 - name: Display php81 role completion
   debug:

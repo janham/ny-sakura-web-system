@@ -1,12 +1,19 @@
 ---
 # MariaDB クライアントインストール
-- name: Install MariaDB client
-  dnf:
-    name:
+- name: Install MariaDB client using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: mariadb-client
+    offline_temp_dir: /tmp/mariadb-packages
+    package_names:
       - mariadb
+      - mariadb-common
+      - mariadb-connector-c
+      - perl-Sys-Hostname
       - python3-PyMySQL
-    state: present
-  become: true
 
 - name: Verify MariaDB client installation
   command: mysql --version

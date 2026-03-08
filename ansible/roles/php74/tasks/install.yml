@@ -1,14 +1,18 @@
 ---
 # PHP 7.4 インストール
-- name: Install PHP 7.4 core packages from Remi
-  dnf:
-    name:
+- name: Install PHP 7.4 core packages using offline_package_install role
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: php74-core
+    offline_temp_dir: /tmp/php74-core-packages
+    package_names:
       - php74-php
       - php74-php-cli
       - php74-php-fpm
-    state: present
-    enablerepo: remi
-  become: true
+      - php74-php-common
 
 - name: Verify PHP 7.4 installation
   command: /opt/remi/php74/root/usr/bin/php -v
@@ -18,6 +22,7 @@
 - name: Display PHP 7.4 version
   debug:
     msg: "{{ php74_version.stdout_lines[0] }}"
+  when: php74_version.stdout_lines is defined and php74_version.stdout_lines | length > 0
 
 - name: Create symlink for easy access (optional)
   file:
