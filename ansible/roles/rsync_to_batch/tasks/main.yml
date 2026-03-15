@@ -1,0 +1,151 @@
+---
+# rsync_to_batch role tasks
+
+- name: Ensure rsync is installed
+  dnf:
+    name: rsync
+    state: present
+  become: true
+
+- name: Check if rsync SSH key exists
+  stat:
+    path: "{{ rsync_ssh_key_path }}"
+  register: rsync_key_stat
+  become: true
+  become_user: "{{ rsync_user }}"
+
+- name: Generate rsync SSH key
+  command: >
+    ssh-keygen -t ed25519
+    -C "{{ rsync_ssh_key_comment }}"
+    -f {{ rsync_ssh_key_path }}
+    -N ""
+  become: true
+  become_user: "{{ rsync_user }}"
+  when: not rsync_key_stat.stat.exists
+
+- name: Set permissions on rsync SSH private key
+  file:
+    path: "{{ rsync_ssh_key_path }}"
+    owner: "{{ rsync_user }}"
+    group: "{{ rsync_user }}"
+    mode: '0600'
+  become: true
+
+- name: Set permissions on rsync SSH public key
+  file:
+    path: "{{ rsync_ssh_key_path }}.pub"
+    owner: "{{ rsync_user }}"
+    group: "{{ rsync_user }}"
+    mode: '0644'
+  become: true
+
+- name: Read public key content
+  slurp:
+    src: "{{ rsync_ssh_key_path }}.pub"
+  register: rsync_public_key
+  become: true
+  become_user: "{{ rsync_user }}"
+
+- name: Add public key to batch server authorized_keys
+  authorized_key:
+    user: "{{ rsync_user }}"
+    key: "{{ rsync_public_key.content | b64decode }}"
+    state: present
+  delegate_to: gs-batch
+  become: true
+
+- name: Test SSH connection to batch server
+  command: >
+    ssh -i {{ rsync_ssh_key_path }}
+    -p {{ batch_server_port }}
+    -o StrictHostKeyChecking=no
+    -o BatchMode=yes
+    {{ rsync_user }}@{{ batch_server_host }}
+    "echo 'SSH OK'"
+  register: ssh_test
+  changed_when: false
+  failed_when: ssh_test.rc != 0
+  become: true
+  become_user: "{{ rsync_user }}"
+
+- name: Display SSH test result
+  debug:
+    msg: "{{ ssh_test.stdout }}"
+
+- name: Ensure destination directory exists on batch server
+  file:
+    path: "{{ rsync_dest_dir }}"
+    state: directory
+    owner: "{{ rsync_user }}"
+    group: "{{ rsync_user }}"
+    mode: '0755'
+  delegate_to: gs-batch
+  become: true
+
+- name: Create rsync script
+  template:
+    src: rsync_to_batch.sh.j2
+    dest: "{{ rsync_script_path }}"
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Create rsync log file
+  file:
+    path: "{{ rsync_log_file }}"
+    state: touch
+    owner: "{{ rsync_user }}"
+    group: "{{ rsync_user }}"
+    mode: '0644'
+    modification_time: preserve
+    access_time: preserve
+  become: true
+
+- name: Perform initial rsync (dry-run)
+  command: >
+    rsync -av --delete --dry-run
+    -e "ssh -i {{ rsync_ssh_key_path }} -p {{ batch_server_port }} -o StrictHostKeyChecking=no"
+    {% for pattern in rsync_exclude_patterns %}--exclude '{{ pattern }}' {% endfor %}
+    {{ rsync_source_dir }} {{ rsync_user }}@{{ batch_server_host }}:{{ rsync_dest_dir }}
+  register: initial_sync_dryrun
+  become: true
+  become_user: "{{ rsync_user }}"
+  when: rsync_enable_initial_sync
+  changed_when: false
+
+- name: Display initial sync dry-run result
+  debug:
+    msg: "{{ initial_sync_dryrun.stdout_lines | default([]) }}"
+  when: rsync_enable_initial_sync
+
+- name: Perform initial rsync
+  command: "{{ rsync_script_path }}"
+  become: true
+  become_user: "{{ rsync_user }}"
+  when: rsync_enable_initial_sync
+  register: initial_sync
+
+- name: Add cron job for rsync
+  cron:
+    name: "Rsync portal2-new to batch server"
+    minute: "{{ rsync_cron_minute }}"
+    hour: "{{ rsync_cron_hour }}"
+    day: "{{ rsync_cron_day }}"
+    month: "{{ rsync_cron_month }}"
+    weekday: "{{ rsync_cron_weekday }}"
+    user: "{{ rsync_user }}"
+    job: "{{ rsync_script_path }}"
+    state: present
+  become: true
+
+- name: Configure logrotate for rsync log
+  template:
+    src: rsync_to_batch_logrotate.j2
+    dest: /etc/logrotate.d/rsync_to_batch
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  when: rsync_enable_logrotate

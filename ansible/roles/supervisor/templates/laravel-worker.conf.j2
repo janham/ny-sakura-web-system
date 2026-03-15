@@ -1,0 +1,12 @@
+[program:laravel-worker]
+process_name=%(program_name)s_%(process_num)02d
+command={{ php_binary }} {{ laravel_app_path }}/artisan queue:work --sleep={{ laravel_queue_sleep }} --tries={{ laravel_queue_tries }} --max-time={{ laravel_queue_timeout }}
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user={{ laravel_queue_user }}
+numprocs={{ laravel_queue_processes }}
+redirect_stderr=true
+stdout_logfile={{ supervisor_log_file }}
+stopwaitsecs={{ laravel_queue_timeout }}

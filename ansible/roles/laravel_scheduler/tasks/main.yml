@@ -1,0 +1,34 @@
+---
+# Laravel Scheduler setup
+
+- name: Create Laravel scheduler log file
+  file:
+    path: "{{ laravel_scheduler_log }}"
+    state: touch
+    owner: "{{ laravel_cron_user }}"
+    group: "{{ laravel_cron_user }}"
+    mode: '0644'
+  become: true
+
+- name: Add Laravel Scheduler to crontab
+  cron:
+    name: "Laravel Scheduler"
+    minute: "*"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    user: "{{ laravel_cron_user }}"
+    job: "cd {{ laravel_app_path }} && {{ php_binary }} artisan schedule:run >> {{ laravel_scheduler_log }} 2>&1"
+    state: present
+  become: true
+
+- name: Verify cron job is set
+  command: crontab -l -u {{ laravel_cron_user }}
+  register: cron_list
+  changed_when: false
+  become: true
+
+- name: Display cron jobs
+  debug:
+    msg: "{{ cron_list.stdout_lines }}"

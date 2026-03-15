@@ -28,6 +28,12 @@
     - firewall
     - common
 
+- name: Install common packages
+  include_tasks: packages.yml
+  tags:
+    - packages
+    - common
+
 - name: Update system packages
   include_tasks: system_update.yml
   tags:

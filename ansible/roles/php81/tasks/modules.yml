@@ -16,6 +16,7 @@
       - php-xml
       - php-opcache
       - php-pecl-zip
+      - libzip
       - php-bcmath
       - php-json
       - php-intl

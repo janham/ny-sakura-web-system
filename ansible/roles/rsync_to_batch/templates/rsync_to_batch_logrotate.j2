@@ -1,0 +1,9 @@
+{{ rsync_log_file }} {
+    daily
+    rotate {{ rsync_logrotate_days }}
+    compress
+    delaycompress
+    notifempty
+    missingok
+    create 0644 {{ rsync_user }} {{ rsync_user }}
+}

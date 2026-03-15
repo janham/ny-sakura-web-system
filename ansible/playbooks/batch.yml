@@ -25,6 +25,21 @@
     - role: php74
       tags: [php74, phase5]
 
+    - role: composer
+      tags: [composer, phase6]
+
+    - role: laravel_app
+      tags: [laravel_app, phase7]
+
+    - role: laravel_scheduler
+      tags: [laravel_scheduler, phase8]
+
+    - role: laravel_logrotate
+      tags: [laravel_logrotate, phase9]
+
+    - role: supervisor
+      tags: [supervisor, phase10]
+
   post_tasks:
     - name: Display playbook completion
       debug:

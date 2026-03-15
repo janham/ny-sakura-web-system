@@ -1,0 +1,10 @@
+{{ laravel_app_path }}/storage/logs/*.log {
+    {{ logrotate_frequency }}
+    rotate {{ logrotate_rotate_count }}
+    compress
+    delaycompress
+    notifempty
+    missingok
+    create 0644 {{ logrotate_owner }} {{ logrotate_group }}
+    sharedscripts
+}

@@ -1,0 +1,21 @@
+---
+# Supervisor role default variables
+
+# Configure queue worker (set to true when queue worker is needed)
+supervisor_configure_queue_worker: false
+
+# Laravel application path
+laravel_app_path: /mnt/shared/apps/laravel
+
+# Queue worker settings
+laravel_queue_user: gsuser
+laravel_queue_processes: 2
+laravel_queue_sleep: 3
+laravel_queue_tries: 3
+laravel_queue_timeout: 3600
+
+# Supervisor log
+supervisor_log_file: /var/log/laravel-worker.log
+
+# PHP binary path
+php_binary: /usr/bin/php

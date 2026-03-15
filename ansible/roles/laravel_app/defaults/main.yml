@@ -1,0 +1,13 @@
+---
+# Laravel App role default variables
+
+# Laravel application path
+laravel_app_path: /mnt/shared/apps/laravel
+
+# Application owner
+laravel_app_owner: gsuser
+laravel_app_group: gsuser
+
+# Storage directories permissions
+laravel_storage_mode: '0775'
+laravel_bootstrap_cache_mode: '0775'

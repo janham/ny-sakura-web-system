@@ -1,0 +1,90 @@
+---
+# Laravel App setup - Directory preparation
+
+- name: Create base directory for Laravel application
+  file:
+    path: "{{ laravel_app_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Create Laravel application root directory
+  file:
+    path: "{{ laravel_app_path }}"
+    state: directory
+    owner: "{{ laravel_app_owner }}"
+    group: "{{ laravel_app_group }}"
+    mode: '0755'
+  become: true
+
+- name: Check if Laravel application exists
+  stat:
+    path: "{{ laravel_app_path }}/artisan"
+  register: laravel_artisan
+
+- name: Display Laravel application status
+  debug:
+    msg: "Laravel application is {{ 'found' if laravel_artisan.stat.exists else 'not found' }} at {{ laravel_app_path }}"
+
+- name: Create Laravel storage directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ laravel_app_owner }}"
+    group: "{{ laravel_app_group }}"
+    mode: "{{ laravel_storage_mode }}"
+    recurse: yes
+  loop:
+    - "{{ laravel_app_path }}/storage"
+    - "{{ laravel_app_path }}/storage/app"
+    - "{{ laravel_app_path }}/storage/app/public"
+    - "{{ laravel_app_path }}/storage/framework"
+    - "{{ laravel_app_path }}/storage/framework/cache"
+    - "{{ laravel_app_path }}/storage/framework/cache/data"
+    - "{{ laravel_app_path }}/storage/framework/sessions"
+    - "{{ laravel_app_path }}/storage/framework/views"
+    - "{{ laravel_app_path }}/storage/logs"
+  become: true
+  when: laravel_artisan.stat.exists
+
+- name: Create bootstrap/cache directory
+  file:
+    path: "{{ laravel_app_path }}/bootstrap/cache"
+    state: directory
+    owner: "{{ laravel_app_owner }}"
+    group: "{{ laravel_app_group }}"
+    mode: "{{ laravel_bootstrap_cache_mode }}"
+  become: true
+  when: laravel_artisan.stat.exists
+
+- name: Set permissions for storage directory
+  file:
+    path: "{{ laravel_app_path }}/storage"
+    state: directory
+    owner: "{{ laravel_app_owner }}"
+    group: "{{ laravel_app_group }}"
+    mode: "{{ laravel_storage_mode }}"
+    recurse: yes
+  become: true
+  when: laravel_artisan.stat.exists
+
+- name: Set permissions for bootstrap/cache directory
+  file:
+    path: "{{ laravel_app_path }}/bootstrap/cache"
+    state: directory
+    owner: "{{ laravel_app_owner }}"
+    group: "{{ laravel_app_group }}"
+    mode: "{{ laravel_bootstrap_cache_mode }}"
+  become: true
+  when: laravel_artisan.stat.exists
+
+- name: Display Laravel setup completion message
+  debug:
+    msg: >
+      Laravel directories prepared.
+      {% if not laravel_artisan.stat.exists %}
+      NOTE: Laravel application not found at {{ laravel_app_path }}.
+      Please deploy your Laravel application manually or using a deployment role.
+      {% endif %}

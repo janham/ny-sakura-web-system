@@ -1,0 +1,41 @@
+---
+# Composer installation - Main tasks
+
+- name: Check if Composer is already installed
+  stat:
+    path: "{{ composer_install_dir }}/{{ composer_binary_name }}"
+  register: composer_bin
+
+- name: Display Composer installation status
+  debug:
+    msg: "Composer is {{ 'already installed' if composer_bin.stat.exists else 'not installed' }}"
+
+- name: Install Composer (online mode)
+  include_tasks: install_online.yml
+  when:
+    - not composer_bin.stat.exists
+    - server_type == 'web'
+
+- name: Install Composer (offline mode)
+  include_tasks: install_offline.yml
+  when:
+    - not composer_bin.stat.exists
+    - server_type == 'batch'
+
+- name: Verify Composer installation (file exists)
+  stat:
+    path: "{{ composer_install_dir }}/{{ composer_binary_name }}"
+  register: composer_verify
+  become: true
+
+- name: Display Composer installation result
+  debug:
+    msg: "Composer is {{ 'installed' if composer_verify.stat.exists else 'not installed' }} at {{ composer_install_dir }}/{{ composer_binary_name }}"
+
+- name: Set Composer global permissions
+  file:
+    path: "{{ composer_install_dir }}/{{ composer_binary_name }}"
+    mode: '0755'
+    owner: root
+    group: root
+  become: true

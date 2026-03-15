@@ -1,0 +1,83 @@
+---
+# Supervisor installation and configuration
+
+- name: Install Supervisor using offline_package_install
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: supervisor
+    offline_temp_dir: /tmp/supervisor-packages
+    package_names:
+      - supervisor
+
+- name: Create supervisor config directory
+  file:
+    path: /etc/supervisord.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Enable and start supervisord
+  systemd:
+    name: supervisord
+    state: started
+    enabled: true
+  become: true
+
+- name: Wait for supervisord to be ready
+  pause:
+    seconds: 5
+
+- name: Check supervisor basic status
+  command: supervisorctl status
+  register: supervisor_status
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Display supervisor status
+  debug:
+    msg: "{{ supervisor_status.stdout_lines | default(['No programs configured']) }}"
+
+# Queue Worker Configuration (conditional)
+- name: Create Supervisor config for Laravel Queue Worker
+  template:
+    src: laravel-worker.conf.j2
+    dest: /etc/supervisord.d/laravel-worker.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: restart supervisord
+  when: supervisor_configure_queue_worker | default(false)
+
+- name: Reload supervisor configuration
+  command: supervisorctl reread
+  become: true
+  changed_when: false
+  failed_when: false
+  when: supervisor_configure_queue_worker | default(false)
+
+- name: Update supervisor processes
+  command: supervisorctl update
+  become: true
+  changed_when: false
+  failed_when: false
+  when: supervisor_configure_queue_worker | default(false)
+
+- name: Check queue worker status
+  command: supervisorctl status laravel-worker:*
+  register: queue_worker_status
+  changed_when: false
+  failed_when: false
+  become: true
+  when: supervisor_configure_queue_worker | default(false)
+
+- name: Display queue worker status
+  debug:
+    msg: "{{ queue_worker_status.stdout_lines }}"
+  when: supervisor_configure_queue_worker | default(false)

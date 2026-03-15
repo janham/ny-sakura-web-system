@@ -1,0 +1,14 @@
+---
+# Laravel Logrotate role default variables
+
+# Laravel application path
+laravel_app_path: /mnt/shared/apps/laravel
+
+# Laravel scheduler log file
+laravel_scheduler_log: /var/log/laravel-scheduler.log
+
+# Log rotation settings
+logrotate_frequency: daily
+logrotate_rotate_count: 30
+logrotate_owner: gsuser
+logrotate_group: gsuser

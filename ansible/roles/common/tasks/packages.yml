@@ -1,0 +1,16 @@
+---
+# Install common packages
+- name: Install common packages using offline_package_install
+  include_role:
+    name: offline_package_install
+  vars:
+    offline_mode: "{{ server_type == 'batch' }}"
+    offline_proxy_server: gs-web
+    offline_package_name: common-packages
+    offline_temp_dir: /tmp/common-packages
+    package_names:
+      - rsync
+      - vim-enhanced
+      - wget
+      - curl
+      - unzip

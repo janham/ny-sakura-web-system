@@ -1,0 +1,8 @@
+---
+# Supervisor handlers
+
+- name: restart supervisord
+  systemd:
+    name: supervisord
+    state: restarted
+  become: true

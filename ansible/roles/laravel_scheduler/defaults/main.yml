@@ -1,0 +1,14 @@
+---
+# Laravel Scheduler role default variables
+
+# Laravel application path
+laravel_app_path: /mnt/shared/apps/laravel
+
+# Laravel scheduler log file
+laravel_scheduler_log: /var/log/laravel-scheduler.log
+
+# Cron user
+laravel_cron_user: gsuser
+
+# PHP binary path
+php_binary: /usr/bin/php

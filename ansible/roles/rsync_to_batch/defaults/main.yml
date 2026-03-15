@@ -1,0 +1,46 @@
+---
+# rsync_to_batch role default variables
+
+# SSH key for rsync
+rsync_ssh_key_path: "/home/{{ rsync_user }}/.ssh/rsync_key"
+rsync_ssh_key_comment: "web-to-batch-rsync"
+
+# Rsync user
+rsync_user: gsuser
+
+# Batch server connection
+batch_server_host: "{{ hostvars['gs-batch']['ansible_host'] }}"
+batch_server_port: 22
+
+# Source and destination directories
+rsync_source_dir: "/var/www/app/portal2-new/"
+rsync_dest_dir: "/var/www/app/portal2-new/"
+
+# Exclude patterns
+rsync_exclude_patterns:
+  - '.env'
+  - '.git'
+  - 'node_modules'
+  - 'storage/logs'
+  - 'storage/framework'
+  - 'storage/debugbar'
+  - 'storage/telescope'
+  - 'bootstrap/cache/*.php'
+
+# Script and log paths
+rsync_script_path: "/usr/local/bin/rsync_to_batch.sh"
+rsync_log_file: "/var/log/rsync_to_batch.log"
+
+# Cron schedule (every 5 minutes)
+rsync_cron_minute: "*/5"
+rsync_cron_hour: "*"
+rsync_cron_day: "*"
+rsync_cron_month: "*"
+rsync_cron_weekday: "*"
+
+# Enable initial sync
+rsync_enable_initial_sync: false
+
+# Enable logrotate
+rsync_enable_logrotate: true
+rsync_logrotate_days: 7

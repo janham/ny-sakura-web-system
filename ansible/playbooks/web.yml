@@ -54,6 +54,16 @@
         - ssl
         - phase7
 
+    - role: supervisor
+      tags:
+        - supervisor
+        - phase8
+
+    - role: rsync_to_batch
+      tags:
+        - rsync_to_batch
+        - phase9
+
   post_tasks:
     - name: Display playbook completion
       debug:

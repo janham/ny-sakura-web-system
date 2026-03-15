@@ -8,3 +8,25 @@ nfs_apps_group: gsuser
 
 # System update control
 common_system_update: false
+
+# Laravel settings
+laravel_app_path: /var/www/laravel
+laravel_app_owner: gsuser
+laravel_app_group: gsuser
+
+# Laravel Scheduler
+laravel_scheduler_log: /var/log/laravel-scheduler.log
+laravel_cron_user: gsuser
+
+# Laravel Queue (set to true if using queue workers)
+laravel_use_queue: false
+
+# Laravel Queue settings (used when laravel_use_queue is true)
+laravel_queue_user: gsuser
+laravel_queue_processes: 2
+laravel_queue_sleep: 3
+laravel_queue_tries: 3
+laravel_queue_timeout: 3600
+
+# PHP binary
+php_binary: /usr/bin/php
