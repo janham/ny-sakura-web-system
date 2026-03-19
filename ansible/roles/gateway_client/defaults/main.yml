@@ -1,0 +1,12 @@
+---
+# gateway_client role default variables
+
+# Gateway server (Web server acting as NAT gateway)
+gateway_server_ip: "192.168.0.10"
+
+# Private network interface (use eth0 for batch server)
+client_private_interface: eth0
+
+# Verify internet connectivity after configuration
+gateway_verify_connectivity: true
+gateway_test_host: "8.8.8.8"

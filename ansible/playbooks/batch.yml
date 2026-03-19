@@ -40,6 +40,10 @@
     - role: supervisor
       tags: [supervisor, phase10]
 
+    - role: gateway_client
+      tags: [gateway_client, phase11]
+      when: enable_batch_internet_access | default(false)
+
   post_tasks:
     - name: Display playbook completion
       debug:

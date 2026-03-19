@@ -1,0 +1,175 @@
+---
+# Gateway NAT role tasks - Configure web server as NAT gateway
+
+- name: Display gateway_nat role start
+  debug:
+    msg: "Configuring {{ inventory_hostname }} as NAT gateway for {{ gateway_nat_network }}"
+
+- name: Check current IP forwarding status
+  command: cat /proc/sys/net/ipv4/ip_forward
+  register: ip_forward_status
+  changed_when: false
+
+- name: Display current IP forwarding status
+  debug:
+    msg: "Current IP forwarding: {{ 'enabled' if ip_forward_status.stdout == '1' else 'disabled' }}"
+
+- name: Enable IP forwarding (runtime)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    sysctl_set: true
+  become: true
+  when: gateway_enable_ip_forward
+
+- name: Enable IP forwarding (persistent)
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^net\.ipv4\.ip_forward'
+    line: 'net.ipv4.ip_forward = 1'
+    state: present
+  become: true
+  when: gateway_enable_ip_forward
+
+- name: Verify IP forwarding is enabled
+  command: cat /proc/sys/net/ipv4/ip_forward
+  register: ip_forward_verify
+  changed_when: false
+  failed_when: ip_forward_verify.stdout != '1'
+  when: not ansible_check_mode
+
+- name: Install iptables-services for persistence
+  dnf:
+    name: iptables-services
+    state: present
+  become: true
+  when: gateway_install_iptables_services
+
+- name: Remove default FORWARD REJECT rule
+  shell: iptables -D FORWARD -j REJECT --reject-with icmp-host-prohibited 2>/dev/null || true
+  become: true
+  when: gateway_cleanup_default_rules
+  changed_when: false
+
+- name: Remove default INPUT REJECT rule
+  shell: iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited 2>/dev/null || true
+  become: true
+  when: gateway_cleanup_default_rules
+  changed_when: false
+
+- name: Check if SSH port rule exists in INPUT chain
+  shell: iptables -L INPUT -n | grep -q "tcp dpt:{{ gateway_ssh_port }}" || echo "not_found"
+  register: ssh_port_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Allow SSH port in INPUT chain
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{ gateway_ssh_port }}"
+    ctstate: NEW
+    jump: ACCEPT
+  become: true
+  when: ssh_port_check.stdout == "not_found"
+  notify: save iptables
+
+- name: Check existing iptables NAT rules
+  shell: iptables -t nat -L POSTROUTING -n | grep -q "{{ gateway_nat_network }}" || echo "not_found"
+  register: nat_rule_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Add iptables NAT (MASQUERADE) rule
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ gateway_nat_network }}"
+    out_interface: "{{ gateway_public_interface }}"
+    jump: MASQUERADE
+  become: true
+  when: nat_rule_check.stdout == "not_found"
+  notify: save iptables
+
+- name: Check existing iptables FORWARD rules (private to public)
+  shell: iptables -L FORWARD -n | grep -q "{{ gateway_private_interface }}.*{{ gateway_public_interface }}" || echo "not_found"
+  register: forward_rule1_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Add iptables FORWARD rule (private to public)
+  iptables:
+    chain: FORWARD
+    in_interface: "{{ gateway_private_interface }}"
+    out_interface: "{{ gateway_public_interface }}"
+    jump: ACCEPT
+  become: true
+  when: forward_rule1_check.stdout == "not_found"
+  notify: save iptables
+
+- name: Check existing iptables FORWARD rules (public to private - established)
+  shell: iptables -L FORWARD -n | grep -q "{{ gateway_public_interface }}.*{{ gateway_private_interface }}.*RELATED,ESTABLISHED" || echo "not_found"
+  register: forward_rule2_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Add iptables FORWARD rule (public to private - established)
+  iptables:
+    chain: FORWARD
+    in_interface: "{{ gateway_public_interface }}"
+    out_interface: "{{ gateway_private_interface }}"
+    ctstate: RELATED,ESTABLISHED
+    jump: ACCEPT
+  become: true
+  when: forward_rule2_check.stdout == "not_found"
+  notify: save iptables
+
+- name: Add iptables logging (optional)
+  iptables:
+    chain: FORWARD
+    jump: LOG
+    log_prefix: "{{ gateway_log_prefix }}"
+    log_level: "4"
+  become: true
+  when: gateway_enable_logging
+  notify: save iptables
+
+- name: Enable and start iptables service
+  systemd:
+    name: iptables
+    enabled: true
+    state: started
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Display iptables NAT rules
+  command: iptables -t nat -L POSTROUTING -n -v
+  register: nat_rules
+  changed_when: false
+  become: true
+  when: not ansible_check_mode
+
+- name: Display iptables FORWARD rules
+  command: iptables -L FORWARD -n -v
+  register: forward_rules
+  changed_when: false
+  become: true
+  when: not ansible_check_mode
+
+- name: Show configured rules
+  debug:
+    msg:
+      - "=== NAT Rules ==="
+      - "{{ nat_rules.stdout_lines }}"
+      - "=== FORWARD Rules ==="
+      - "{{ forward_rules.stdout_lines }}"
+  when: not ansible_check_mode
+
+- name: Display gateway_nat role completion
+  debug:
+    msg: "NAT gateway configuration completed on {{ inventory_hostname }}"

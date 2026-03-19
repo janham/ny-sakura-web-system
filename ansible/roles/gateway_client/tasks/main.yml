@@ -1,0 +1,79 @@
+---
+# Gateway Client role tasks - Configure batch server to use web server as gateway
+
+- name: Display gateway_client role start
+  debug:
+    msg: "Configuring {{ inventory_hostname }} to use {{ gateway_server_ip }} as gateway"
+
+- name: Check current default gateway
+  command: ip route show default
+  register: current_gateway
+  changed_when: false
+
+- name: Display current gateway
+  debug:
+    msg: "Current default gateway: {{ current_gateway.stdout }}"
+
+- name: Get NetworkManager connection name for private interface
+  shell: "nmcli -t -f NAME,DEVICE connection show --active | grep ':{{ client_private_interface }}$' | cut -d: -f1"
+  register: nm_connection_name
+  changed_when: false
+  failed_when: nm_connection_name.stdout == ""
+
+- name: Display NetworkManager connection
+  debug:
+    msg: "NetworkManager connection: {{ nm_connection_name.stdout }}"
+
+- name: Check if gateway is already configured
+  shell: "nmcli -t -f ipv4.gateway connection show '{{ nm_connection_name.stdout }}' | cut -d: -f2"
+  register: configured_gateway
+  changed_when: false
+
+- name: Display configured gateway in NetworkManager
+  debug:
+    msg: "Gateway in NetworkManager: {{ configured_gateway.stdout if configured_gateway.stdout else 'Not set' }}"
+
+- name: Configure gateway in NetworkManager
+  command: nmcli connection modify "{{ nm_connection_name.stdout }}" ipv4.gateway "{{ gateway_server_ip }}"
+  become: true
+  when: configured_gateway.stdout != gateway_server_ip
+
+- name: Restart NetworkManager connection
+  command: nmcli connection up "{{ nm_connection_name.stdout }}"
+  become: true
+  when: configured_gateway.stdout != gateway_server_ip
+
+- name: Wait for network to stabilize
+  pause:
+    seconds: 3
+
+- name: Verify new default gateway
+  command: ip route show default
+  register: new_gateway
+  changed_when: false
+
+- name: Display new gateway
+  debug:
+    msg: "New default gateway: {{ new_gateway.stdout }}"
+
+- name: Verify gateway is reachable
+  command: ping -c 3 {{ gateway_server_ip }}
+  register: gateway_ping
+  changed_when: false
+  failed_when: gateway_ping.rc != 0
+
+- name: Test internet connectivity via gateway
+  command: ping -c 3 {{ gateway_test_host }}
+  register: internet_ping
+  changed_when: false
+  failed_when: internet_ping.rc != 0
+  when: gateway_verify_connectivity
+
+- name: Display connectivity test result
+  debug:
+    msg: "Internet connectivity test: {{ 'SUCCESS' if internet_ping.rc == 0 else 'FAILED' }}"
+  when: gateway_verify_connectivity
+
+- name: Display gateway_client role completion
+  debug:
+    msg: "Gateway client configuration completed on {{ inventory_hostname }}"

@@ -1,0 +1,25 @@
+---
+# gateway_nat role default variables
+
+# Network interfaces
+gateway_public_interface: eth0
+gateway_private_interface: eth1
+
+# Private network to allow NAT
+gateway_nat_network: "192.168.0.0/24"
+
+# Enable IP forwarding
+gateway_enable_ip_forward: true
+
+# Install iptables-services for persistence
+gateway_install_iptables_services: true
+
+# Enable iptables logging (optional)
+gateway_enable_logging: false
+gateway_log_prefix: "GATEWAY-NAT: "
+
+# SSH port to allow (defaults to ssh_port variable or 26622)
+gateway_ssh_port: "{{ ssh_port | default(26622) }}"
+
+# Clean up default iptables-services REJECT rules
+gateway_cleanup_default_rules: true

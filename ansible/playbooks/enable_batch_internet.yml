@@ -1,0 +1,59 @@
+---
+# Enable Internet Access for Batch Server via Web Server NAT Gateway
+#
+# This playbook configures:
+# 1. Web server as NAT gateway (gateway_nat role)
+# 2. Batch server to use web server as gateway (gateway_client role)
+#
+# Usage:
+#   ansible-playbook playbooks/enable_batch_internet.yml
+
+- name: Configure Web Server as NAT Gateway
+  hosts: web
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display gateway setup start
+      debug:
+        msg: "Configuring {{ inventory_hostname }} as NAT gateway"
+
+  roles:
+    - role: gateway_nat
+      tags: [gateway_nat]
+
+  post_tasks:
+    - name: Display web server gateway configuration completed
+      debug:
+        msg: "NAT gateway configuration completed on {{ inventory_hostname }}"
+
+- name: Configure Batch Server to Use Gateway
+  hosts: batch
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display gateway client setup start
+      debug:
+        msg: "Configuring {{ inventory_hostname }} to use web server as gateway"
+
+  roles:
+    - role: gateway_client
+      tags: [gateway_client]
+
+  post_tasks:
+    - name: Display batch server gateway configuration completed
+      debug:
+        msg: "Gateway client configuration completed on {{ inventory_hostname }}"
+    - name: Display final status
+      debug:
+        msg:
+          - "=========================================="
+          - "Internet access setup completed!"
+          - "=========================================="
+          - "Web server ({{ hostvars[groups['web'][0]]['inventory_hostname'] }}) is now acting as NAT gateway"
+          - "Batch server ({{ inventory_hostname }}) can now access the internet"
+          - ""
+          - "Test connectivity on batch server:"
+          - "  ping -c 3 8.8.8.8"
+          - "  curl -I https://www.google.com"

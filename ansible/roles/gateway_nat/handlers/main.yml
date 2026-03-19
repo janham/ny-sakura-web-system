@@ -1,0 +1,7 @@
+---
+# Gateway NAT role handlers
+
+- name: save iptables
+  shell: iptables-save > /etc/sysconfig/iptables
+  become: true
+  listen: save iptables

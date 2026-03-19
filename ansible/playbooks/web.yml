@@ -64,6 +64,12 @@
         - rsync_to_batch
         - phase9
 
+    - role: gateway_nat
+      tags:
+        - gateway_nat
+        - phase10
+      when: enable_batch_internet_access | default(false)
+
   post_tasks:
     - name: Display playbook completion
       debug:
