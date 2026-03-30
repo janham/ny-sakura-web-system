@@ -1,0 +1,72 @@
+---
+- name: Nginx Geo Module Configuration
+  block:
+    - name: Display nginx_geo role start
+      debug:
+        msg: "Configuring nginx geo module for {{ inventory_hostname }}"
+
+    - name: Fetch Japan IP ranges from APNIC
+      include_tasks: fetch_japan_ip.yml
+      tags:
+        - nginx_geo
+        - geo_japan_ip
+
+    - name: Generate geo configuration
+      include_tasks: generate_geo_config.yml
+      tags:
+        - nginx_geo
+        - geo_config
+
+    - name: Apply geo blocking to VirtualHosts
+      include_tasks: apply_virtualhost.yml
+      tags:
+        - nginx_geo
+        - geo_vhosts
+
+    - name: Test nginx configuration
+      shell: nginx -t
+      become: true
+      register: nginx_test_result
+      changed_when: false
+
+    - name: Display nginx test result
+      debug:
+        var: nginx_test_result.stderr_lines
+
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+      become: true
+      when: nginx_test_result.rc == 0
+
+    - name: Display nginx_geo role completion
+      debug:
+        msg: "nginx geo module configuration completed successfully"
+
+  rescue:
+    - name: Configuration failed - rollback
+      debug:
+        msg: "nginx geo configuration failed. Attempting rollback..."
+
+    - name: Restore previous nginx configuration
+      shell: |
+        if [ -d /etc/nginx.backup ]; then
+          rm -rf /etc/nginx
+          mv /etc/nginx.backup /etc/nginx
+        fi
+      become: true
+
+    - name: Test restored configuration
+      shell: nginx -t
+      become: true
+
+    - name: Reload nginx with restored config
+      systemd:
+        name: nginx
+        state: reloaded
+      become: true
+
+    - name: Fail task
+      fail:
+        msg: "nginx geo configuration failed and rolled back"

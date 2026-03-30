@@ -1,0 +1,19 @@
+---
+# nginx_geo role defaults
+nginx_geo_enabled: true
+nginx_geo_backup_existing: true
+nginx_geo_verify_syntax: true
+
+# JPNIC/APNIC settings
+japan_ipv4_source: "https://ftp.apnic.net/stats/apnic/delegated-apnic-latest"
+japan_ipv4_fetch_retries: 3
+japan_ipv4_fetch_delay: 5
+
+# Geo configuration
+geo_block_response_code: 444  # Close connection without response
+geo_allow_private_ips: true
+geo_allow_localhost: true
+
+# Logging
+nginx_geo_log_enabled: true
+nginx_geo_log_path: "/var/log/nginx/geo_access.log"

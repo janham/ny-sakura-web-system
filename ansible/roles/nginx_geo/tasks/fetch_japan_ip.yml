@@ -1,0 +1,47 @@
+---
+- name: Create temporary directory
+  tempfile:
+    state: directory
+  register: temp_dir
+  check_mode: no
+
+- name: Fetch APNIC delegated file
+  shell: |
+    curl -s https://ftp.apnic.net/stats/apnic/delegated-apnic-latest | \
+    awk -F'|' 'BEGIN {
+      # Precompute CIDR masks from host counts using ** (power operator)
+      for(i=0;i<=32;i++) cidrmask[2**i] = 32-i
+    }
+    /\|JP\|ipv4\|/ {
+      ip=$4
+      count=$5
+      if (count in cidrmask) {
+        printf "%s/%d\n", ip, cidrmask[count]
+      }
+    }' | \
+    sort > {{ temp_dir.path }}/japan_ipv4.txt
+  changed_when: false
+  retries: 3
+  delay: 5
+  check_mode: no
+
+- name: Display fetched IP count
+  shell: "wc -l {{ temp_dir.path }}/japan_ipv4.txt"
+  register: ip_count
+  changed_when: false
+  check_mode: no
+
+- name: Debug Japan IP count
+  debug:
+    msg: "Japan IPv4 ranges: {{ ip_count.stdout }}"
+
+- name: Store Japan IPs in variable
+  shell: "cat {{ temp_dir.path }}/japan_ipv4.txt"
+  register: japan_ipv4_list
+  changed_when: false
+  check_mode: no
+
+- name: Clean temp directory
+  file:
+    path: "{{ temp_dir.path }}"
+    state: absent

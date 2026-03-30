@@ -1,0 +1,23 @@
+---
+- name: Backup existing nginx configuration
+  shell: |
+    if [ ! -d /etc/nginx.backup ]; then
+      cp -a /etc/nginx /etc/nginx.backup
+    fi
+  become: true
+  when: nginx_geo_backup_existing
+
+- name: Template geo_jp_only.conf
+  template:
+    src: geo_jp_only.conf.j2
+    dest: /etc/nginx/conf.d/geo_jp_only.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  become: true
+
+- name: Verify geo configuration syntax
+  shell: nginx -t
+  become: true
+  changed_when: false

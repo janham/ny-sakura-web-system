@@ -54,6 +54,12 @@
         - ssl
         - phase7
 
+    - role: nginx_geo
+      tags:
+        - nginx_geo
+        - phase7_5
+      when: nginx_geo_enabled | default(true)
+
     - role: supervisor
       tags:
         - supervisor
