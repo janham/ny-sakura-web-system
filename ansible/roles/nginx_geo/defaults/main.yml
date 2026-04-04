@@ -17,3 +17,8 @@ geo_allow_localhost: true
 # Logging
 nginx_geo_log_enabled: true
 nginx_geo_log_path: "/var/log/nginx/geo_access.log"
+
+# Site-specific geo blocking control
+# List of sites to exclude from geo blocking (allow all countries)
+nginx_geo_exclude_sites: []
+  # Example: ['portal2-new', 'supplier2']

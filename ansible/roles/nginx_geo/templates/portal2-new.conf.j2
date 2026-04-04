@@ -29,12 +29,17 @@ server {
 
     server_name portal2-new.mobileselection.jp;
 
+{% if 'portal2-new' not in nginx_geo_exclude_sites %}
     # BEGIN ANSIBLE MANAGED GEO BLOCKING
     # Geographic Access Control - Japan Only
     if ($allowed_country = no) {
         return {{ geo_block_response_code }};
     }
     # END ANSIBLE MANAGED GEO BLOCKING
+{% else %}
+    # GEO BLOCKING DISABLED FOR THIS SITE
+    # Reason: Webhook/external API access required
+{% endif %}
 
     # BEGIN ANSIBLE MANAGED ACME CHALLENGE
     # Allow Let's Encrypt ACME challenges

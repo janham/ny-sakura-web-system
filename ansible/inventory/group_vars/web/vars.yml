@@ -14,3 +14,8 @@ app_sites:
   - supplier2
   - portal2
   - portal2-new
+
+# Geo blocking exclusions
+# Sites in this list will NOT have geo blocking applied (allow all countries)
+nginx_geo_exclude_sites:
+  - portal2-new  # Webhook/external API access required
