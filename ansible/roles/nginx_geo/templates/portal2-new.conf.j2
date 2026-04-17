@@ -46,16 +46,14 @@ server {
 
     # BEGIN ANSIBLE MANAGED WEBHOOK ENDPOINT
     # Smaregi Webhook endpoint - NO geo blocking (allow all countries)
+    # try_files を使わず直接 PHP-FPM に渡す。
+    # try_files による内部リダイレクトを行うと /index.php への再マッチが発生し、
+    # トップレベルの location ~ \.php$ (geo blocking あり) に落ちてしまうため。
     location ~ ^/api/smaregi/webhooks/ {
-        try_files $uri $uri/ /index.php?$query_string;
-
-        location ~ \.php$ {
-            try_files $uri =404;
-            fastcgi_pass unix:/run/php-fpm/www.sock;
-            fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            include fastcgi_params;
-        }
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php-fpm/www.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+        fastcgi_param SCRIPT_NAME     /index.php;
     }
     # END ANSIBLE MANAGED WEBHOOK ENDPOINT
 
