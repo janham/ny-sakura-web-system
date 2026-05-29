@@ -3,7 +3,7 @@
 # Generated: {{ ansible_date_time.iso8601 }}
 
 geo $allowed_country {
-    default no;
+    default yes;
 
     # Japan IP ranges (from APNIC)
 {% for ip in japan_ipv4_list.stdout_lines %}

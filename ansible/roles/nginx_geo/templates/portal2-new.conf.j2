@@ -105,6 +105,7 @@ server {
         include fastcgi_params;
     }
 
+
     # Deny access to hidden files
     location ~ /\. {
         deny all;
@@ -117,8 +118,8 @@ server {
 
     # BEGIN ANSIBLE MANAGED HTTP TO HTTPS REDIRECT
     # Redirect HTTP to HTTPS
-    if ($scheme = http) {
-        return 301 https://$server_name$request_uri;
-    }
+#    if ($scheme = http) {
+#        return 301 https://$server_name$request_uri;
+#    }
     # END ANSIBLE MANAGED HTTP TO HTTPS REDIRECT
 }
